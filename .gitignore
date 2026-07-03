@@ -1,6 +1,7 @@
-# Secrets — NEVER commit Kalshi API keys / credentials
+# Secrets — NEVER commit API keys / credentials
 .env
 .env.*
+!.env.example
 *.pem
 secrets/
 credentials*.json
