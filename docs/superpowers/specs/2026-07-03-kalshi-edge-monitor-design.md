@@ -60,19 +60,33 @@ Each component is isolated, single-purpose, and independently testable.
    - WebSocket subscription for live price updates.
    - **Contains no order endpoints.**
 
-2. **`data_sources`** — free football data behind one interface, cached locally with age flags:
-   - Historical international match results (public dataset) — for the Dixon-Coles fit.
-   - World Football Elo ratings — strength prior.
-   - football-data.org (free tier) — recent WC fixtures/results/schedule.
-   - FBref goals-per-90 — for player-props (key strikers) only.
-   - Scrapers/fetchers isolated behind a common `Source` interface; each caches to SQLite and
-     exposes a `fetched_at` timestamp.
+2. **`data_sources`** — free football data behind one interface, cached locally with age flags.
+   **Recommendations must be grounded in real player/team/lineup/coach patterns, not just the
+   price edge** (see §3a). Verified free sources (2026-07-03):
+   - **Historical international results** — `martj42/international_results` (1872→2026, no key).
+     Drives the Dixon-Coles fit and team form/H2H history.
+   - **World Football Elo ratings** — team strength prior (no key).
+   - **`openfootball/worldcup.json`** — 2026 fixtures, groups, squads (public domain, no key).
+   - **FBref** (scrape / worldfootballR) — player goals-per-90, minutes, intl xG → per-player
+     scoring rates for props and team-form signals. Rate-limited; cache aggressively.
+   - **`jfjelstul/worldcup`** — historical in-match events (goals, subs) for player/team history.
+   - **Confirmed lineups + coaches** — **API-Football (api-sports.io)**, `/fixtures/lineups`,
+     `/players`, `/coachs`. Requires a **free API key** (free tier ~100 req/day; covers 1–4
+     games/day). This is the only paid-tier-gated piece; degrade gracefully to projected XI /
+     squad-only if absent. `football-data.org` free tier is a fallback for squad + coach (no XI).
+   - Each fetcher isolated behind a common `Source` interface; caches to SQLite with a
+     `fetched_at` timestamp. **API keys come from env/`.env`, never committed** (see §3 guardrails).
 
-3. **`goal_model`** — Dixon-Coles bivariate Poisson.
+3. **`goal_model`** — Dixon-Coles bivariate Poisson, adjusted by real match context.
    - Fit team attack/defense strengths + home advantage from results, blended with the Elo
      prior for teams with sparse data.
-   - Output: per-match **joint** score matrix `P(home_goals, away_goals)`.
-   - Manual-override hook (adjust a team's expected goals for lineup/injury/motivation news).
+   - **Context adjustments** applied to per-team expected goals (λ) from `data_sources`:
+     confirmed/absent key players in the **lineup**, **coach** tendencies, rest/rotation,
+     recent form. When lineups aren't yet posted, fall back to squad-strength with a wider
+     uncertainty flag.
+   - Output: per-match **joint** score matrix `P(home_goals, away_goals)`, plus a structured
+     **analysis record** (the drivers behind the numbers) consumed by the report (§9).
+   - Manual-override hook (adjust a team's λ for late news).
    - Behind a `GoalModel` interface so alternative sports/models can be swapped in.
 
 4. **`pricer`** — joint matrix → fair probability per Kalshi contract type:
@@ -103,22 +117,34 @@ Each component is isolated, single-purpose, and independently testable.
    - A plain-text/markdown recommendation report: today's games; per-market fair vs Kalshi;
      flagged edges; suggested combos with sizing. Designed to be run on demand and read back
      to the operator from a phone via Claude remote control / dispatch.
+   - **Each recommendation carries its analysis record** (§3a): the lineup/coach/form/H2H
+     drivers behind the model's number, so the operator sees *why*, not just an edge figure.
    - Optional push alert on threshold cross.
    - Read-only surface; operator trades manually. **No dashboard / web server.**
+
+### 3a. Grounding requirement (recommendations rest on real patterns)
+
+Every recommendation must be backed by a **detailed, data-driven analysis** — historical
+player form/scoring rates, team strength & H2H, the game's **lineups**, and **coach**
+tendencies — not purely the market-vs-model price edge. The edge is *confirmation*, not the
+sole driver. Concretely: the `goal_model` produces an **analysis record** alongside the joint
+score matrix, and `report` surfaces it with each flagged bet. If the grounding data (esp.
+lineups) is missing, the recommendation is emitted with a wider-uncertainty flag or withheld,
+never presented as high-conviction on price edge alone.
 
 ## 5. Data flow
 
 ```
-free data (results/Elo/fixtures/FBref)
-        │  (fit daily)
+free data (results/Elo/fixtures/FBref) + lineups/coaches (API-Football)
+        │  (fit daily + per-game context)
         ▼
-   goal_model ──► pricer ──► fair prices (today's games)
+   goal_model ──► pricer ──► fair prices + analysis record (today's games)
                                    │
 kalshi_client (live prices+depth) ─┤
                                    ▼
                              edge_engine ──► combo_optimizer ──► sizing
                                    │                                │
-                                   └──────────────► dashboard / alerts ──► operator trades
+                                   └──────────────► report / alerts ──► operator trades
 ```
 
 Backtest runs offline over historical Kalshi data + historical results to validate before
@@ -132,7 +158,7 @@ log, and backtest results. Chosen for zero-setup and easy inspection.
 ## 7. Error handling
 
 - Each data source degrades to stale cache with a visible age flag; pricer refuses if too old.
-- `kalshi_client` retries with backoff; surfaces API/WebSocket disconnects on the dashboard.
+- `kalshi_client` retries with backoff; surfaces API/WebSocket disconnects in the report.
 - `edge_engine` hard-suppresses on missing liquidity or absurd edge rather than showing a
   tempting-but-wrong signal.
 
@@ -150,7 +176,9 @@ Three sub-projects, each its own spec → plan → implementation cycle:
   reconstruct effective prices/depth, pull historical data for the backtest. Verifiable
   directly against the live API. *(Built first — dependency of everything.)*
 - **SP2 — data_sources + goal_model + pricer + backtest.** Independent fair prices for
-  today's games, validated by the backtest harness.
+  today's games, **grounded in real player/team/lineup/coach data (§2, §3, §3a)** and
+  validated by the backtest harness. Free no-key sources for the baseline; a free API-Football
+  key adds confirmed lineups + coaches (degrades gracefully without it).
 - **SP3 — edge_engine + combo_optimizer + sizing + text report/alerts.** The headless
   recommendation surface, run on demand from a phone via Claude remote control / dispatch.
 
