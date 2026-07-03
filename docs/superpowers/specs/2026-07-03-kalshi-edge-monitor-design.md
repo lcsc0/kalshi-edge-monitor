@@ -99,10 +99,12 @@ Each component is isolated, single-purpose, and independently testable.
      hit-rate by edge bucket, simulated fractional-Kelly P&L).
    - **This is the gate that clears the "UNVALIDATED" banner.**
 
-9. **`dashboard` + `alerts`** — local FastAPI app + one HTML page:
-   - Today's games; per-market fair vs Kalshi; flagged edges; suggested combos with sizing.
+9. **`report` + `alerts`** — headless text output, no web UI:
+   - A plain-text/markdown recommendation report: today's games; per-market fair vs Kalshi;
+     flagged edges; suggested combos with sizing. Designed to be run on demand and read back
+     to the operator from a phone via Claude remote control / dispatch.
    - Optional push alert on threshold cross.
-   - Read-only surface; operator trades manually.
+   - Read-only surface; operator trades manually. **No dashboard / web server.**
 
 ## 5. Data flow
 
@@ -137,7 +139,8 @@ log, and backtest results. Chosen for zero-setup and easy inspection.
 ## 8. Tech
 
 Python. `httpx` + `websockets` (Kalshi), `numpy`/`scipy`/`pandas` (model & backtest),
-`sqlite3`, `FastAPI` + a single static HTML page (dashboard).
+`sqlite3`. Output is a headless text/markdown report (no web server) — invoked from a phone
+via Claude remote control / dispatch.
 
 ## 9. Decomposition & build order
 
@@ -148,8 +151,8 @@ Three sub-projects, each its own spec → plan → implementation cycle:
   directly against the live API. *(Built first — dependency of everything.)*
 - **SP2 — data_sources + goal_model + pricer + backtest.** Independent fair prices for
   today's games, validated by the backtest harness.
-- **SP3 — edge_engine + combo_optimizer + sizing + dashboard/alerts.** The monitor surface
-  the operator watches.
+- **SP3 — edge_engine + combo_optimizer + sizing + text report/alerts.** The headless
+  recommendation surface, run on demand from a phone via Claude remote control / dispatch.
 
 Future (separate, out of scope here): **SP4 — auto-execution**, gated behind a green backtest
 and a paper-trading period, disabled by default behind a hard flag.
