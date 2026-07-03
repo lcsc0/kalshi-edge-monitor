@@ -15,5 +15,5 @@ dev = ["pytest>=8", "respx>=0.21"]
 packages = ["src/kalshi_edge"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 markers = ["live: hits the real Kalshi API (skipped unless --run-live)"]

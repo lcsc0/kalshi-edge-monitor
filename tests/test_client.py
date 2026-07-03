@@ -41,3 +41,19 @@ def test_historical_candlesticks_passes_params():
         return_value=httpx.Response(200, json={"candlesticks": []}))
     _client().get_historical_candlesticks("T", start_ts=1, end_ts=2, period_interval=60)
     assert route.calls.last.request.url.params["period_interval"] == "60"
+
+
+from scripts.pull_today import format_market_line
+from kalshi_edge.kalshi.models import EffectivePrices
+
+
+def test_format_market_line_renders_prices():
+    ep = EffectivePrices(yes_bid=0.60, yes_ask=0.62, yes_mid=0.61, spread=0.02)
+    line = format_market_line({"ticker": "T", "title": "Brazil win"}, ep)
+    assert "T" in line and "Brazil win" in line and "0.60" in line and "0.62" in line
+
+
+def test_format_market_line_handles_missing_prices():
+    ep = EffectivePrices(yes_bid=None, yes_ask=None, yes_mid=None, spread=None)
+    line = format_market_line({"ticker": "T", "title": "X"}, ep)
+    assert "n/a" in line
