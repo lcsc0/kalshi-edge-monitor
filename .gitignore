@@ -1,0 +1,28 @@
+# Secrets — NEVER commit Kalshi API keys / credentials
+.env
+.env.*
+*.pem
+secrets/
+credentials*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local data / model artifacts / DB
+*.sqlite
+*.sqlite3
+*.db
+data/
+cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
