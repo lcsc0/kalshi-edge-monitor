@@ -58,3 +58,23 @@ def team_goal_rates(conn, team: str, since: str | None = None) -> tuple[float, f
             scored += m["away_score"]; conceded += m["home_score"]
     n = len(matches)
     return (scored / n, conceded / n)
+
+
+def load_goalscorers_csv(conn, text: str) -> int:
+    rows = list(csv.DictReader(io.StringIO(text)))
+    conn.executemany(
+        "INSERT INTO goals VALUES (?,?,?,?,?,?,?,?)",
+        [(r["date"], r["home_team"], r["away_team"], r["team"], r["scorer"],
+          _int(r["minute"]), _flag(r["own_goal"]), _flag(r["penalty"])) for r in rows])
+    _record(conn, "goalscorers", len(rows))
+    conn.commit()
+    return len(rows)
+
+
+def player_goal_count(conn, scorer: str, since: str | None = None) -> int:
+    query = "SELECT COUNT(*) FROM goals WHERE scorer = ? AND own_goal = 0"
+    args = [scorer]
+    if since:
+        query += " AND date >= ?"
+        args.append(since)
+    return conn.execute(query, args).fetchone()[0]

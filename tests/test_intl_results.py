@@ -1,6 +1,7 @@
 from kalshi_edge.data.cache import connect
 from kalshi_edge.data.intl_results import (
     load_results_csv, team_matches, team_goal_rates,
+    load_goalscorers_csv, player_goal_count,
 )
 
 RESULTS = (
@@ -33,3 +34,25 @@ def test_team_goal_rates_averages_scored_and_conceded():
     scored, conceded = team_goal_rates(conn, "Brazil")
     assert round(scored, 4) == round(5 / 3, 4)
     assert round(conceded, 4) == round(4 / 3, 4)
+
+
+GOALS = (
+    "date,home_team,away_team,team,scorer,minute,own_goal,penalty\n"
+    "2026-06-01,Brazil,Chile,Brazil,Neymar,23,FALSE,FALSE\n"
+    "2026-06-01,Brazil,Chile,Brazil,Neymar,67,FALSE,TRUE\n"
+    "2026-06-01,Brazil,Chile,Chile,Own Player,80,TRUE,FALSE\n"
+    "2026-06-05,Argentina,Brazil,Brazil,Neymar,12,FALSE,FALSE\n"
+)
+
+
+def test_load_goalscorers_inserts_and_records_meta():
+    conn = connect()
+    assert load_goalscorers_csv(conn, GOALS) == 4
+    assert conn.execute("SELECT COUNT(*) FROM goals").fetchone()[0] == 4
+
+
+def test_player_goal_count_excludes_own_goals_and_respects_since():
+    conn = connect(); load_goalscorers_csv(conn, GOALS)
+    assert player_goal_count(conn, "Neymar") == 3
+    assert player_goal_count(conn, "Neymar", since="2026-06-03") == 1
+    assert player_goal_count(conn, "Own Player") == 0  # own goal excluded
