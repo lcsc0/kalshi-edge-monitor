@@ -25,3 +25,14 @@ def parse_orderbook(raw: dict, ticker: str) -> Orderbook:
     yes_raw = raw.get("yes") or raw.get("yes_dollars")
     no_raw = raw.get("no") or raw.get("no_dollars")
     return Orderbook(ticker=ticker, yes=_levels(yes_raw), no=_levels(no_raw))
+
+
+def effective_prices(ob: Orderbook) -> EffectivePrices:
+    yes_bid = ob.yes[0].price / 100 if ob.yes else None
+    yes_ask = (100 - ob.no[0].price) / 100 if ob.no else None
+    if yes_bid is not None and yes_ask is not None:
+        mid = (yes_bid + yes_ask) / 2
+        spread = yes_ask - yes_bid
+    else:
+        mid = spread = None
+    return EffectivePrices(yes_bid=yes_bid, yes_ask=yes_ask, yes_mid=mid, spread=spread)
