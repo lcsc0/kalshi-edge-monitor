@@ -22,6 +22,9 @@ venv/
 data/
 cache/
 
+# Large recorded fixture (3.9MB series dump) — regenerate via scripts/record_fixtures.py
+tests/fixtures/series_sports.json
+
 # OS / editor
 .DS_Store
 .idea/

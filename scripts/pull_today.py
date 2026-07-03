@@ -23,7 +23,11 @@ def main() -> None:
     if not SOCCER_SERIES_TICKERS:
         print("No SOCCER_SERIES_TICKERS configured — run scripts/record_fixtures.py first.")
         return
-    for market in todays_soccer_markets(client, SOCCER_SERIES_TICKERS, today):
+    markets = list(todays_soccer_markets(client, SOCCER_SERIES_TICKERS, today))
+    if not markets:
+        print(f"No soccer markets with a match on {today} in the configured series.")
+        return
+    for market in markets:
         ob = client.get_orderbook(market["ticker"])
         print(format_market_line(market, effective_prices(ob)))
 
