@@ -32,7 +32,10 @@ class KalshiClient:
 
     def get_orderbook(self, ticker: str) -> Orderbook:
         body = self._http.get_json(f"/markets/{ticker}/orderbook")
-        return parse_orderbook(body.get("orderbook") or {}, ticker=ticker)
+        # Live API wraps the book in `orderbook_fp` (dollar strings); older shape used
+        # `orderbook` (cents). parse_orderbook normalizes either representation.
+        raw = body.get("orderbook_fp") or body.get("orderbook") or {}
+        return parse_orderbook(raw, ticker=ticker)
 
     def get_events(self, *, series_ticker=None, status="open") -> list[dict]:
         params = {"status": status}

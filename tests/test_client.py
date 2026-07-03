@@ -21,11 +21,13 @@ def test_iter_markets_follows_cursor():
 
 
 @respx.mock
-def test_get_orderbook_returns_parsed_orderbook():
+def test_get_orderbook_reads_orderbook_fp_and_parses_dollars():
+    # Live shape: wrapped in `orderbook_fp` with `*_dollars` price strings.
     respx.get(f"{BASE}/markets/T/orderbook").mock(return_value=httpx.Response(
-        200, json={"orderbook": {"yes": [[60, 100]], "no": [[38, 200]]}}))
+        200, json={"orderbook_fp": {"yes_dollars": [["0.60", "100"]],
+                                    "no_dollars": [["0.38", "200"]]}}))
     ob = _client().get_orderbook("T")
-    assert ob.ticker == "T" and ob.yes[0].price == 60 and ob.no[0].price == 38
+    assert ob.ticker == "T" and ob.yes[0].price == 0.60 and ob.no[0].price == 0.38
 
 
 @respx.mock

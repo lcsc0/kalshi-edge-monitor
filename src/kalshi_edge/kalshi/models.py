@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class OrderbookLevel:
-    price: int   # cents, 1..99
-    count: int   # number of contracts resting at this price
+    price: float  # dollars == probability, 0..1 (Kalshi contracts pay $1; sub-cent allowed)
+    count: int    # number of contracts resting at this price
 
 
 @dataclass(frozen=True)

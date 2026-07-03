@@ -1,13 +1,16 @@
 from kalshi_edge.kalshi.models import OrderbookLevel, Orderbook, EffectivePrices, Fill
 
 
-def _to_cents(price) -> int:
-    """Accept int cents (60) or dollar string/float ('0.60', 0.6) -> int cents."""
+def _to_price(price) -> float:
+    """Normalize a raw price to dollars, which equals probability (0..1).
+
+    Kalshi's live `orderbook_fp` returns dollar strings ('0.60', sub-cent '0.0010').
+    Some inputs use whole cents (60). Heuristic: a value > 1 is cents -> divide by 100.
+    A Kalshi dollar price already equals the contract's implied probability.
+    """
     if isinstance(price, str):
         price = float(price)
-    if isinstance(price, float):
-        return round(price * 100) if price <= 1.0 else round(price)
-    return int(price)
+    return price / 100 if price > 1 else float(price)
 
 
 def _to_count(count) -> int:
@@ -17,7 +20,7 @@ def _to_count(count) -> int:
 def _levels(rows) -> tuple[OrderbookLevel, ...]:
     if not rows:
         return ()
-    levels = [OrderbookLevel(price=_to_cents(p), count=_to_count(c)) for p, c in rows]
+    levels = [OrderbookLevel(price=_to_price(p), count=_to_count(c)) for p, c in rows]
     return tuple(sorted(levels, key=lambda lvl: lvl.price, reverse=True))
 
 
@@ -28,8 +31,8 @@ def parse_orderbook(raw: dict, ticker: str) -> Orderbook:
 
 
 def effective_prices(ob: Orderbook) -> EffectivePrices:
-    yes_bid = ob.yes[0].price / 100 if ob.yes else None
-    yes_ask = (100 - ob.no[0].price) / 100 if ob.no else None
+    yes_bid = ob.yes[0].price if ob.yes else None
+    yes_ask = (1 - ob.no[0].price) if ob.no else None
     if yes_bid is not None and yes_ask is not None:
         mid = (yes_bid + yes_ask) / 2
         spread = yes_ask - yes_bid
@@ -40,22 +43,23 @@ def effective_prices(ob: Orderbook) -> EffectivePrices:
 
 def _simulate(levels: tuple[OrderbookLevel, ...], size: int) -> Fill:
     """Walk `levels` (already best-first), where each level offers the opposite
-    side at (100 - level.price) cents. Returns VWAP fill and slippage vs top."""
-    remaining, cost_cents, filled, best = size, 0, 0, None
+    side at (1 - level.price) dollars. Returns VWAP fill and slippage vs top,
+    both as probabilities (dollars)."""
+    remaining, cost, filled, best = size, 0.0, 0, None
     for lvl in levels:
-        ask_cents = 100 - lvl.price
+        ask = 1 - lvl.price
         if best is None:
-            best = ask_cents
+            best = ask
         take = min(remaining, lvl.count)
-        cost_cents += take * ask_cents
+        cost += take * ask
         filled += take
         remaining -= take
         if remaining == 0:
             break
     if filled == 0:
         return Fill(filled=0, avg_price=None, slippage=None)
-    avg = (cost_cents / filled) / 100
-    return Fill(filled=filled, avg_price=avg, slippage=avg - best / 100)
+    avg = cost / filled
+    return Fill(filled=filled, avg_price=avg, slippage=avg - best)
 
 
 def simulate_buy_yes(ob: Orderbook, size: int) -> Fill:
