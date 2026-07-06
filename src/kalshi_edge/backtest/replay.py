@@ -13,26 +13,16 @@ Anything else raises :class:`LookaheadError`.
 """
 from dataclasses import dataclass
 from datetime import date, datetime
-import re
 
 from kalshi_edge.model.goal_model import GoalModel
 from kalshi_edge.model.strengths import DEFAULT_HALF_LIFE_DAYS
 from kalshi_edge.pricer.pricer import Pricer
+# Contract parsing is shared with the live surface — single source of truth.
+from kalshi_edge.kalshi.market_parse import ContractSpec, parse_contract  # noqa: F401
 
 
 class LookaheadError(ValueError):
     """Raised when a replay would use data at or after the match it is pricing."""
-
-
-@dataclass(frozen=True)
-class ContractSpec:
-    """A Pricer leg: ``name`` + optional ``line`` (see ``Pricer.price``).
-
-    ``line`` is a float for totals/team-totals, an ``(h, a)`` tuple for exact
-    score, or ``None`` for moneyline/BTTS.
-    """
-    name: str
-    line: object = None
 
 
 @dataclass(frozen=True)
@@ -69,82 +59,6 @@ def assert_no_lookahead(ref_date: str, kickoff: datetime) -> None:
         raise LookaheadError(
             f"ref_date {ref} is not strictly before kickoff {kickoff.date()} — "
             "the match result could leak into the model fit")
-
-
-# --------------------------------------------------------------------------- #
-# Contract parsing (Kalshi series + subtitle -> Pricer leg)
-# --------------------------------------------------------------------------- #
-
-_OVER_RE = re.compile(r"over\s+(\d+(?:\.\d+)?)", re.I)
-_UNDER_RE = re.compile(r"under\s+(\d+(?:\.\d+)?)", re.I)
-_SCORE_RE = re.compile(r"(\d+)\s*-\s*(\d+)")
-
-
-def _series_key(series: str) -> str:
-    return (series or "").upper().split("-")[0]
-
-
-def parse_contract(series: str, subtitle: str, home: str, away: str) -> ContractSpec | None:
-    """Best-effort map of a Kalshi soccer market to a Pricer leg.
-
-    Returns ``None`` for market types outside the SP2c Pricer surface
-    (spreads, player goals, matchups) — the caller records them as *unmapped*.
-    """
-    key = _series_key(series)
-    sub = (subtitle or "").strip()
-    low = sub.lower()
-
-    if key in ("KXWCGAME", "KXWCMATCHUP", "KXWCTEAMH2H"):
-        # Moneyline: "Reg Time: <team>" / "Reg Time: Draw"
-        target = re.sub(r"(?i)reg\s*time\s*:", "", sub).strip()
-        if target.lower() in ("draw", "tie"):
-            return ContractSpec("draw")
-        if _norm(target) == _norm(home):
-            return ContractSpec("home")
-        if _norm(target) == _norm(away):
-            return ContractSpec("away")
-        return None
-
-    if key in ("KXWCTOTAL", "KXWCTOTALGOAL"):
-        m = _OVER_RE.search(low)
-        if m:
-            return ContractSpec("over", float(m.group(1)))
-        m = _UNDER_RE.search(low)
-        if m:
-            return ContractSpec("under", float(m.group(1)))
-        return None
-
-    if key == "KXWCBTTS":
-        if low.startswith("yes") or "both teams" in low:
-            return ContractSpec("btts")
-        if low.startswith("no"):
-            return ContractSpec("btts_no")
-        return None
-
-    if key == "KXWCTEAMTOTAL":
-        side = "home" if _norm(home) in _norm(sub) else ("away" if _norm(away) in _norm(sub) else None)
-        if side is None:
-            return None
-        m = _OVER_RE.search(low)
-        if m:
-            return ContractSpec(f"{side}_over", float(m.group(1)))
-        m = _UNDER_RE.search(low)
-        if m:
-            return ContractSpec(f"{side}_under", float(m.group(1)))
-        return None
-
-    if key == "KXWCSCORE":
-        m = _SCORE_RE.search(sub)
-        if m:
-            return ContractSpec("exact", (int(m.group(1)), int(m.group(2))))
-        return None
-
-    # KXWCSPREAD, KXWCPLAYERGOALS, and anything unknown: not on the Pricer surface.
-    return None
-
-
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
 # --------------------------------------------------------------------------- #
