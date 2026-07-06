@@ -21,9 +21,12 @@ A "market spec" is::
       "contract_key": str | None,     # key within market_prices (optional)
     }
 """
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import date, datetime, timezone
 
 from kalshi_edge.kalshi.orderbook import effective_prices
+from kalshi_edge.kalshi.soccer import todays_soccer_markets
+from kalshi_edge.kalshi.market_parse import infer_matchup, parse_market, resolve_team
 from kalshi_edge.edge.engine import EdgeEngine
 from kalshi_edge.edge.sizing import size_bet
 from kalshi_edge.combo.optimizer import ComboLeg, optimize
@@ -112,12 +115,96 @@ def build_report(games: list[dict], **kwargs) -> str:
     return render_report(build_report_data(games, **kwargs))
 
 
+def build_games(client, model, *, series_tickers: list[str], target: date,
+                now: datetime) -> tuple[list[dict], list[str]]:
+    """Turn today's live Kalshi soccer markets into `build_report_data` specs.
+
+    Groups each event's markets into one game, infers the matchup from the
+    moneyline legs, resolves both teams against the model roster, builds a
+    `Pricer` + analysis record, maps each market to a Pricer contract and pulls
+    its order book. Returns `(games, skipped)` where `skipped` lists events or
+    markets we could not map (unknown team / contract outside the Pricer
+    surface) so the operator sees the coverage gaps rather than silent drops.
+    """
+    from kalshi_edge.pricer.pricer import Pricer  # local: keeps import graph flat
+
+    by_event: dict[str, list[dict]] = defaultdict(list)
+    for market in todays_soccer_markets(client, series_tickers, target):
+        by_event[market.get("event_ticker") or market.get("ticker")].append(market)
+
+    games: list[dict] = []
+    skipped: list[str] = []
+    for event_ticker, markets in by_event.items():
+        matchup = infer_matchup(markets)
+        if matchup is None:
+            skipped.append(f"{event_ticker}: no moneyline legs to infer teams")
+            continue
+        home = resolve_team(matchup.home, model.teams)
+        away = resolve_team(matchup.away, model.teams)
+        if home is None or away is None:
+            unknown = matchup.home if home is None else matchup.away
+            skipped.append(f"{event_ticker}: team not in model roster ({unknown!r})")
+            continue
+
+        pricer = Pricer.from_model(model, home, away, neutral=matchup.neutral)
+        analysis = model.analysis(home, away, neutral=matchup.neutral)
+        specs = []
+        for market in markets:
+            parsed = parse_market(market, matchup)
+            if parsed is None:
+                skipped.append(f"{market.get('ticker')}: unmapped contract")
+                continue
+            specs.append({
+                "ticker": parsed.ticker,
+                "contract": parsed.contract.name,
+                "line": parsed.contract.line,
+                "label": parsed.label,
+                "orderbook": client.get_orderbook(parsed.ticker),
+                "fetched_at": now,
+            })
+        if specs:
+            games.append({"home": home, "away": away, "pricer": pricer,
+                          "analysis": analysis, "markets": specs})
+    return games, skipped
+
+
 def main() -> None:  # pragma: no cover - live wiring
-    print("**UNVALIDATED MODEL — TRADE SMALL**\n")
-    print("recommend.py wires GoalModel -> Pricer -> EdgeEngine -> combo -> report.")
-    print("Live use needs a ticker->contract map (SP1 market parsing) to build the")
-    print("`games` specs; call build_report_data(...) with those specs to render.")
-    _ = (EdgeEngine, datetime.now(timezone.utc))
+    from kalshi_edge.config import KALSHI_BASE_URL, SOCCER_SERIES_TICKERS
+    from kalshi_edge.kalshi.http import KalshiHTTP
+    from kalshi_edge.kalshi.client import KalshiClient
+    from kalshi_edge.data.cache import connect
+    from kalshi_edge.model.goal_model import GoalModel
+
+    DB = "data/football.sqlite"
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    ref_date = today.isoformat()
+
+    try:
+        conn = connect(DB)
+        model = GoalModel.from_db(conn, ref_date=ref_date, since="2016-01-01")
+    except Exception as exc:  # noqa: BLE001 - degrade to a clear message
+        print("**UNVALIDATED MODEL — TRADE SMALL**\n")
+        print(f"Could not build the goal model from {DB}: {exc}")
+        print("Run `python scripts/build_db.py` first.")
+        return
+
+    client = KalshiClient(http=KalshiHTTP(base_url=KALSHI_BASE_URL))
+    try:
+        games, skipped = build_games(client, model, series_tickers=SOCCER_SERIES_TICKERS,
+                                     target=today, now=now)
+    except Exception as exc:  # noqa: BLE001 - network / API unreachable
+        print("**UNVALIDATED MODEL — TRADE SMALL**\n")
+        print(f"Could not reach Kalshi live markets: {exc}")
+        return
+
+    engine = EdgeEngine()
+    print(build_report(games, engine=engine, now=now, bankroll=1000.0,
+                       date=ref_date, validated=False))
+    if skipped:
+        print("\nSkipped (unmapped / unknown team):")
+        for line in skipped:
+            print(f"  - {line}")
 
 
 if __name__ == "__main__":
