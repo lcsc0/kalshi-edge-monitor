@@ -40,3 +40,12 @@ def correct_score(matrix, home_goals: int, away_goals: int) -> float:
     if 0 <= home_goals < len(matrix) and 0 <= away_goals < len(matrix[0]):
         return matrix[home_goals][away_goals]
     return 0.0
+
+
+def spread_cover(matrix, line: float, side: str) -> float:
+    """P(side wins by more than `line` goals). line 1.5 -> margin >= 2."""
+    if side == "home":
+        return sum(p for x, y, p in _cells(matrix) if (x - y) > line)
+    if side == "away":
+        return sum(p for x, y, p in _cells(matrix) if (y - x) > line)
+    raise ValueError(f"side must be 'home' or 'away', got {side!r}")

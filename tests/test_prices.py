@@ -1,4 +1,4 @@
-from kalshi_edge.pricer.prices import moneyline, total_over, total_under, team_total_over, btts, correct_score
+from kalshi_edge.pricer.prices import moneyline, total_over, total_under, team_total_over, btts, correct_score, spread_cover
 
 # matrix[home][away]; home in {0,1}, away in {0,1}
 M = [[0.1, 0.2], [0.3, 0.4]]
@@ -30,3 +30,9 @@ def test_btts_both_teams_score():
 def test_correct_score_exact_and_out_of_range():
     assert round(correct_score(M, 1, 0), 6) == 0.3
     assert correct_score(M, 5, 5) == 0.0
+
+
+def test_spread_cover_by_margin():
+    assert round(spread_cover(M, 0.5, "home"), 6) == 0.3
+    assert round(spread_cover(M, 0.5, "away"), 6) == 0.2
+    assert round(spread_cover(M, 1.5, "home"), 6) == 0.0
