@@ -22,3 +22,21 @@ def total_over(matrix, line: float) -> float:
 
 def total_under(matrix, line: float) -> float:
     return sum(p for x, y, p in _cells(matrix) if x + y < line)
+
+
+def team_total_over(matrix, line: float, side: str) -> float:
+    if side == "home":
+        return sum(p for x, y, p in _cells(matrix) if x > line)
+    if side == "away":
+        return sum(p for x, y, p in _cells(matrix) if y > line)
+    raise ValueError(f"side must be 'home' or 'away', got {side!r}")
+
+
+def btts(matrix) -> float:
+    return sum(p for x, y, p in _cells(matrix) if x >= 1 and y >= 1)
+
+
+def correct_score(matrix, home_goals: int, away_goals: int) -> float:
+    if 0 <= home_goals < len(matrix) and 0 <= away_goals < len(matrix[0]):
+        return matrix[home_goals][away_goals]
+    return 0.0
