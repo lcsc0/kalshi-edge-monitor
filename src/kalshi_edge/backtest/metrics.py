@@ -120,6 +120,7 @@ class KellyConfig:
 
 @dataclass
 class PnLResult:
+    starting_bankroll: float
     final_bankroll: float
     total_pnl: float
     total_staked: float
@@ -173,8 +174,9 @@ def _walk(signals: list[BacktestSignal], cfg: KellyConfig, stake_fn) -> PnLResul
         if peak > 0:
             max_dd = max(max_dd, (peak - bankroll) / peak)
     roi = total_pnl / total_staked if total_staked else 0.0
-    return PnLResult(final_bankroll=bankroll, total_pnl=total_pnl, total_staked=total_staked,
-                     roi=roi, max_drawdown=max_dd, n_bets=n_bets, bankroll_curve=curve)
+    return PnLResult(starting_bankroll=cfg.starting_bankroll, final_bankroll=bankroll,
+                     total_pnl=total_pnl, total_staked=total_staked, roi=roi,
+                     max_drawdown=max_dd, n_bets=n_bets, bankroll_curve=curve)
 
 
 def simulate_kelly_pnl(signals: list[BacktestSignal], config: KellyConfig = KellyConfig()) -> PnLResult:
