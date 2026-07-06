@@ -65,7 +65,7 @@ def fit_dixon_coles(conn, ref_date: str, since: str | None = None,
         return -np.sum(w * ll)
 
     x0 = np.concatenate([np.zeros(2*T), [0.25, -0.05]])
-    bounds = [(-3, 3)]*(2*T) + [(0.0, 1.0), (-0.2, 0.2)]
+    bounds = [(-3, 3)]*(2*T) + [(1e-9, 1.0), (-0.2, 0.2)]
     res = minimize(nll, x0, method="L-BFGS-B", bounds=bounds,
                    options={"maxiter": max_iter, "maxfun": 200000})
     att, deff, home, rho = res.x[:T], res.x[T:2*T], float(res.x[2*T]), float(res.x[2*T+1])
