@@ -13,7 +13,8 @@ def decay_weight(match_date: str, ref_date: str,
 
 def team_strengths(conn, ref_date: str,
                    half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
-                   since: str | None = None) -> dict:
+                   since: str | None = None,
+                   before: str | None = None) -> dict:
     """Time-weighted attack/defense ratings (relative to league mean `mu`) + home factor.
 
     attack = (weighted goals scored per match) / mu
@@ -26,6 +27,9 @@ def team_strengths(conn, ref_date: str,
     if since:
         query += " AND date >= ?"
         args.append(since)
+    if before:
+        query += " AND date < ?"
+        args.append(before)
 
     gs: dict = {}
     gc: dict = {}
