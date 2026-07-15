@@ -62,18 +62,19 @@ def test_build_games_maps_event_and_skips_unmapped():
         _market("M-AWAY", "KXWCGAME", "Reg Time: Weak"),
         _market("M-OVER", "KXWCTOTAL", "Over 2.5 goals scored"),
         _market("M-SPREAD", "KXWCSPREAD", "Strong wins by more than 1.5 goals"),
+        _market("M-PLAYER", "KXWCPLAYERGOALS", "Some Striker: 1+"),
     ]
     client = FakeClient(markets)
     games, skipped = recommend.build_games(
-        client, _model(), series_tickers=["KXWCGAME", "KXWCTOTAL", "KXWCSPREAD"],
+        client, _model(), series_tickers=["KXWCGAME", "KXWCTOTAL", "KXWCSPREAD", "KXWCPLAYERGOALS"],
         target=NOW.date(), now=NOW)
 
     assert len(games) == 1
     g = games[0]
     assert g["home"] == "Strong" and g["away"] == "Weak"
     contracts = {m["contract"] for m in g["markets"]}
-    assert contracts == {"home", "draw", "away", "over"}   # spread dropped
-    assert any("M-SPREAD" in s and "unmapped" in s for s in skipped)
+    assert contracts == {"home", "draw", "away", "over", "home_spread"}  # player prop dropped
+    assert any("M-PLAYER" in s and "unmapped" in s for s in skipped)
 
 
 def test_build_games_skips_unknown_team():

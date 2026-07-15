@@ -49,8 +49,12 @@ class ParsedMarket:
 _OVER_RE = re.compile(r"over\s+(\d+(?:\.\d+)?)", re.I)
 _UNDER_RE = re.compile(r"under\s+(\d+(?:\.\d+)?)", re.I)
 _SCORE_RE = re.compile(r"(\d+)\s*-\s*(\d+)")
+# "<team> wins by more than 1.5 goals" / "<team> wins by over 1.5 runs"
+_SPREAD_RE = re.compile(r"(.+?)\s+wins by (?:more than|over)\s+(\d+(?:\.\d+)?)", re.I)
 
 _MONEYLINE_SERIES = ("KXWCGAME", "KXWCMATCHUP", "KXWCTEAMH2H")
+# Series whose YES side is a winning-margin bet (soccer goal diff / baseball run line).
+_SPREAD_SERIES = ("KXWCSPREAD", "KXMLBSPREAD", "KXMLBRUNLINE")
 
 
 def _norm(s: str) -> str:
@@ -116,7 +120,19 @@ def parse_contract(series: str, subtitle: str, home: str, away: str) -> Contract
             return ContractSpec("exact", (int(m.group(1)), int(m.group(2))))
         return None
 
-    # KXWCSPREAD, KXWCPLAYERGOALS and anything unknown are not on the Pricer surface.
+    if key in _SPREAD_SERIES:
+        # Strip any "Goal Diff Reg Time:" / "Reg Time:" prefix before the team name.
+        body = re.sub(r"(?i).*?(?:reg\s*time|goal\s*diff)\s*:", "", sub).strip() or sub
+        m = _SPREAD_RE.search(body)
+        if m:
+            team, line = m.group(1).strip(), float(m.group(2))
+            if _norm(team) == _norm(home):
+                return ContractSpec("home_spread", line)
+            if _norm(team) == _norm(away):
+                return ContractSpec("away_spread", line)
+        return None
+
+    # KXWCPLAYERGOALS and anything unknown are not on the joint-matrix Pricer surface.
     return None
 
 

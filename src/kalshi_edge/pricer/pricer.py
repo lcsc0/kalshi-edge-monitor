@@ -13,7 +13,8 @@ from kalshi_edge.pricer import contracts
 # Legs are (name,) or (name, line): "home"/"draw"/"away", "home_or_draw",
 # "away_or_draw", "not_draw", "over"/"under" (needs line), "btts"/"btts_no",
 # "home_over"/"home_under"/"away_over"/"away_under" (needs line),
-# "home_clean_sheet"/"away_clean_sheet", "exact" (needs (h, a) as line).
+# "home_spread"/"away_spread" (needs line), "home_clean_sheet"/"away_clean_sheet",
+# "exact" (needs (h, a) as line).
 Leg = tuple
 
 
@@ -44,6 +45,10 @@ def _predicate_for(name: str, line=None):
         return contracts.team_over("away", line)
     if name == "away_under":
         return contracts.team_under("away", line)
+    if name == "home_spread":
+        return contracts.home_spread(line)
+    if name == "away_spread":
+        return contracts.away_spread(line)
     if name == "exact":
         return contracts.exact_score(line[0], line[1])
     raise ValueError(f"unknown contract: {name!r}")

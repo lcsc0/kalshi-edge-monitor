@@ -27,8 +27,18 @@ def test_team_total_and_score():
     assert parse_contract("KXWCSCORE", "2-1", "A", "B") == ContractSpec("exact", (2, 1))
 
 
-def test_unsupported_series_returns_none():
-    assert parse_contract("KXWCSPREAD", "France wins by more than 1.5 goals", "France", "B") is None
+def test_spread_maps_to_margin_leg():
+    assert parse_contract("KXWCSPREAD", "France wins by more than 1.5 goals",
+                          "France", "Brazil") == ContractSpec("home_spread", 1.5)
+    assert parse_contract("KXWCSPREAD", "Goal Diff Reg Time: Brazil wins by more than 0.5 goals",
+                          "France", "Brazil") == ContractSpec("away_spread", 0.5)
+    # baseball run line reuses the same parser ("over" phrasing, "runs")
+    assert parse_contract("KXMLBRUNLINE", "New York wins by over 1.5 runs",
+                          "New York", "Boston") == ContractSpec("home_spread", 1.5)
+
+
+def test_player_goals_still_unmapped_here():
+    # Player props are priced separately (not a joint-matrix contract).
     assert parse_contract("KXWCPLAYERGOALS", "Lionel Messi: 1+", "Argentina", "B") is None
 
 
@@ -76,5 +86,5 @@ def test_parse_market_builds_spec():
 
 def test_parse_market_unmapped_returns_none():
     matchup = Matchup("France", "Brazil", neutral=True)
-    assert parse_market({"ticker": "S", "series_ticker": "KXWCSPREAD",
-                         "yes_sub_title": "France wins by more than 1.5 goals"}, matchup) is None
+    assert parse_market({"ticker": "P", "series_ticker": "KXWCPLAYERGOALS",
+                         "yes_sub_title": "Kylian Mbappe: 1+"}, matchup) is None

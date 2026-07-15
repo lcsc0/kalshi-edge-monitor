@@ -3,6 +3,7 @@ from kalshi_edge.model.poisson import score_matrix
 from kalshi_edge.pricer.contracts import (
     price_predicate, home_win, draw, away_win, over, under,
     both_teams_score, team_over, exact_score, clean_sheet,
+    home_spread, away_spread,
 )
 
 
@@ -45,6 +46,18 @@ def test_team_over_and_clean_sheet():
     # away clean sheet => home scores 0
     cs = sum(M[0][y] for y in range(len(M)))
     assert abs(price_predicate(M, clean_sheet("away")) - cs) < 1e-9
+
+
+def test_spread_matches_margin_tail():
+    M = _indep_matrix(2.0, 0.8)
+    # home wins by more than 1.5 => x - y >= 2
+    manual = sum(M[x][y] for x in range(len(M)) for y in range(len(M)) if x - y >= 2)
+    assert abs(price_predicate(M, home_spread(1.5)) - manual) < 1e-9
+    # away spread is the mirror
+    away_manual = sum(M[x][y] for x in range(len(M)) for y in range(len(M)) if y - x >= 2)
+    assert abs(price_predicate(M, away_spread(1.5)) - away_manual) < 1e-9
+    # stronger home => home spread more likely than away spread
+    assert price_predicate(M, home_spread(1.5)) > price_predicate(M, away_spread(1.5))
 
 
 def test_exact_score_reads_one_cell():

@@ -55,6 +55,17 @@ def under(line: float) -> Predicate:
     return lambda x, y: (x + y) < line
 
 
+# --- spread / margin (named side wins by more than `line`) ---
+def home_spread(line: float) -> Predicate:
+    """Home wins by more than `line`, e.g. home_spread(1.5) => (x - y) >= 2."""
+    return lambda x, y: (x - y) > line
+
+
+def away_spread(line: float) -> Predicate:
+    """Away wins by more than `line`, e.g. away_spread(1.5) => (y - x) >= 2."""
+    return lambda x, y: (y - x) > line
+
+
 # --- both teams to score ---
 def both_teams_score(x: int, y: int) -> bool:
     return x >= 1 and y >= 1

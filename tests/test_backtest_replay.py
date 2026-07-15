@@ -78,8 +78,13 @@ def test_parse_correct_score():
     assert spec.name == "exact" and spec.line == (2, 1)
 
 
+def test_parse_spread_maps_to_margin_leg():
+    spec = parse_contract("KXWCSPREAD", "Strong wins by more than 1.5 goals", "Strong", "Weak")
+    assert spec.name == "home_spread" and spec.line == 1.5
+
+
 def test_parse_unmapped_types_return_none():
-    assert parse_contract("KXWCSPREAD", "Strong wins by more than 1.5 goals", "Strong", "Weak") is None
+    # Player props aren't a joint-matrix contract — priced separately.
     assert parse_contract("KXWCPLAYERGOALS", "Lionel Messi: 1+", "Strong", "Weak") is None
 
 
