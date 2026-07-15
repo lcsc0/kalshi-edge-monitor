@@ -1,6 +1,6 @@
 from kalshi_edge.kalshi.market_parse import (
     ContractSpec, Matchup, parse_contract, infer_matchup, resolve_team,
-    parse_market,
+    parse_market, parse_player_prop,
 )
 
 
@@ -37,9 +37,15 @@ def test_spread_maps_to_margin_leg():
                           "New York", "Boston") == ContractSpec("home_spread", 1.5)
 
 
-def test_player_goals_still_unmapped_here():
+def test_player_goals_unmapped_by_parse_contract():
     # Player props are priced separately (not a joint-matrix contract).
     assert parse_contract("KXWCPLAYERGOALS", "Lionel Messi: 1+", "Argentina", "B") is None
+
+
+def test_parse_player_prop_extracts_name_and_threshold():
+    assert parse_player_prop("KXWCPLAYERGOALS", "Lionel Messi: 1+") == ("Lionel Messi", 1)
+    assert parse_player_prop("KXWCPLAYERGOALS", "Kylian Mbappe 2+ goals") == ("Kylian Mbappe", 2)
+    assert parse_player_prop("KXWCTOTAL", "Over 2.5 goals scored") is None
 
 
 # --- matchup inference from the moneyline legs ---

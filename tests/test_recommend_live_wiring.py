@@ -4,7 +4,7 @@ contract mapping, unmapped/unknown-team skipping, and the full render."""
 from datetime import datetime, timezone
 
 from kalshi_edge.data.cache import connect
-from kalshi_edge.data.intl_results import load_results_csv
+from kalshi_edge.data.intl_results import load_results_csv, load_goalscorers_csv
 from kalshi_edge.model.goal_model import GoalModel
 from kalshi_edge.kalshi.models import Orderbook, OrderbookLevel
 from kalshi_edge.edge.engine import EdgeEngine
@@ -26,9 +26,18 @@ ROWS = "date,home_team,away_team,home_score,away_score,tournament,city,country,n
     f"2025-0{i%9+1}-15,Weak,Strong,0,3,Friendly,X,Y,TRUE\n" for i in range(10))
 
 
+GOALS = "date,home_team,away_team,team,scorer,minute,own_goal,penalty\n" + "".join(
+    f"2025-0{i%9+1}-01,Strong,Weak,Strong,Star Striker,10,0,0\n" for i in range(10))
+
+
 def _model():
     conn = connect(); load_results_csv(conn, ROWS)
     return GoalModel.from_db(conn, ref_date="2025-10-01")
+
+
+def _conn_with_goals():
+    conn = connect(); load_results_csv(conn, ROWS); load_goalscorers_csv(conn, GOALS)
+    return conn
 
 
 def _ob():
@@ -87,6 +96,37 @@ def test_build_games_skips_unknown_team():
         target=NOW.date(), now=NOW)
     assert games == []
     assert any("Atlantis" in s for s in skipped)
+
+
+def test_build_games_prices_player_prop_with_conn():
+    markets = [
+        _market("M-HOME", "KXWCGAME", "Reg Time: Strong"),
+        _market("M-AWAY", "KXWCGAME", "Reg Time: Weak"),
+        _market("M-PLAYER", "KXWCPLAYERGOALS", "Star Striker: 1+"),
+    ]
+    games, skipped = recommend.build_games(
+        FakeClient(markets), _model(), series_tickers=["KXWCGAME", "KXWCPLAYERGOALS"],
+        target=NOW.date(), now=NOW, conn=_conn_with_goals())
+    assert len(games) == 1
+    props = [m for m in games[0]["markets"] if m["contract"].startswith("player:")]
+    assert len(props) == 1
+    p = props[0]
+    assert 0.0 < p["model_fair"] < 1.0        # priced off the scoring rate
+    assert p["combinable"] is False           # standalone, not a matrix leg
+
+
+def test_build_games_skips_player_prop_without_conn():
+    markets = [
+        _market("M-HOME", "KXWCGAME", "Reg Time: Strong"),
+        _market("M-AWAY", "KXWCGAME", "Reg Time: Weak"),
+        _market("M-PLAYER", "KXWCPLAYERGOALS", "Star Striker: 1+"),
+    ]
+    games, skipped = recommend.build_games(
+        FakeClient(markets), _model(), series_tickers=["KXWCGAME", "KXWCPLAYERGOALS"],
+        target=NOW.date(), now=NOW)  # no conn
+    contracts = {m["contract"] for m in games[0]["markets"]}
+    assert not any(c.startswith("player:") for c in contracts)
+    assert any("M-PLAYER" in s for s in skipped)
 
 
 def test_build_report_renders_from_built_games():

@@ -51,6 +51,10 @@ _UNDER_RE = re.compile(r"under\s+(\d+(?:\.\d+)?)", re.I)
 _SCORE_RE = re.compile(r"(\d+)\s*-\s*(\d+)")
 # "<team> wins by more than 1.5 goals" / "<team> wins by over 1.5 runs"
 _SPREAD_RE = re.compile(r"(.+?)\s+wins by (?:more than|over)\s+(\d+(?:\.\d+)?)", re.I)
+# "Lionel Messi: 1+" / "Lionel Messi 2+ goals"
+_PLAYER_RE = re.compile(r"^(.*?)[:\s]+(\d+)\s*\+", re.I)
+
+_PLAYER_SERIES = ("KXWCPLAYERGOALS", "KXWCGOAL")
 
 _MONEYLINE_SERIES = ("KXWCGAME", "KXWCMATCHUP", "KXWCTEAMH2H")
 # Series whose YES side is a winning-margin bet (soccer goal diff / baseball run line).
@@ -219,6 +223,22 @@ def resolve_team(name: str, roster) -> str | None:
 # --------------------------------------------------------------------------- #
 # Market -> ParsedMarket
 # --------------------------------------------------------------------------- #
+
+def parse_player_prop(series: str, subtitle: str) -> tuple[str, int] | None:
+    """Map a player-goals market to ``(player_name, threshold)`` or ``None``.
+
+    Player props are priced off a per-player scoring rate (``model.player_props``),
+    not the joint score matrix, so they are handled separately from
+    :func:`parse_contract`.
+    """
+    if _series_key(series) not in _PLAYER_SERIES:
+        return None
+    m = _PLAYER_RE.search((subtitle or "").strip())
+    if not m:
+        return None
+    name = m.group(1).strip()
+    return (name, int(m.group(2))) if name else None
+
 
 def parse_market(market: dict, matchup: Matchup) -> ParsedMarket | None:
     """Map one live market dict to a ``ParsedMarket`` or ``None`` if unmapped."""

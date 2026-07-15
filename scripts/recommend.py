@@ -26,7 +26,10 @@ from datetime import date, datetime, timezone
 
 from kalshi_edge.kalshi.orderbook import effective_prices
 from kalshi_edge.kalshi.soccer import todays_soccer_markets
-from kalshi_edge.kalshi.market_parse import infer_matchup, parse_market, resolve_team
+from kalshi_edge.kalshi.market_parse import (
+    infer_matchup, parse_market, parse_player_prop, resolve_team,
+)
+from kalshi_edge.model.player_props import player_team, player_goal_prob
 from kalshi_edge.edge.engine import EdgeEngine
 from kalshi_edge.edge.sizing import size_bet
 from kalshi_edge.combo.optimizer import ComboLeg, optimize
@@ -70,7 +73,10 @@ def build_report_data(
         market_rows = []
         for spec in g.get("markets", []):
             line = spec.get("line")
-            model_fair = pricer.price(spec["contract"], line)
+            # Player props (and any non-matrix contract) carry a precomputed
+            # `model_fair`; matrix contracts are priced from the joint matrix.
+            model_fair = (spec["model_fair"] if spec.get("model_fair") is not None
+                          else pricer.price(spec["contract"], line))
             sig = engine.evaluate(
                 ticker=spec["ticker"], model_fair=model_fair,
                 orderbook=spec["orderbook"], analysis=analysis,
@@ -85,11 +91,14 @@ def build_report_data(
             })
             if not sig.suppressed:
                 signals.append(sig)
-                leg = (spec["contract"],) if line is None else (spec["contract"], line)
-                cost = _buy_cost(spec["orderbook"], sig.side, sig.market_implied)
-                combo_legs.append(ComboLeg(
-                    game_id=game_id, pricer=pricer, leg=leg,
-                    model_fair=model_fair, market_price=cost, edge=sig.edge))
+                # Only joint-matrix legs can enter same-game combos (the combo
+                # sums the shared goal matrix); player props are standalone.
+                if spec.get("combinable", True):
+                    leg = (spec["contract"],) if line is None else (spec["contract"], line)
+                    cost = _buy_cost(spec["orderbook"], sig.side, sig.market_implied)
+                    combo_legs.append(ComboLeg(
+                        game_id=game_id, pricer=pricer, leg=leg,
+                        model_fair=model_fair, market_price=cost, edge=sig.edge))
         report_games.append({"home": g["home"], "away": g["away"],
                              "markets": market_rows})
 
@@ -116,17 +125,20 @@ def build_report(games: list[dict], **kwargs) -> str:
 
 
 def build_games(client, model, *, series_tickers: list[str], target: date,
-                now: datetime) -> tuple[list[dict], list[str]]:
+                now: datetime, conn=None, since: str | None = None
+                ) -> tuple[list[dict], list[str]]:
     """Turn today's live Kalshi soccer markets into `build_report_data` specs.
 
     Groups each event's markets into one game, infers the matchup from the
     moneyline legs, resolves both teams against the model roster, builds a
     `Pricer` + analysis record, maps each market to a Pricer contract and pulls
-    its order book. Returns `(games, skipped)` where `skipped` lists events or
-    markets we could not map (unknown team / contract outside the Pricer
-    surface) so the operator sees the coverage gaps rather than silent drops.
+    its order book. Player-goals props are priced off `model.player_props` using
+    the goals `conn` (skipped if no `conn` is supplied). Returns `(games,
+    skipped)` where `skipped` lists events or markets we could not map so the
+    operator sees the coverage gaps rather than silent drops.
     """
     from kalshi_edge.pricer.pricer import Pricer  # local: keeps import graph flat
+    from kalshi_edge.kalshi.market_parse import market_series, market_subtitle
 
     by_event: dict[str, list[dict]] = defaultdict(list)
     for market in todays_soccer_markets(client, series_tickers, target):
@@ -148,20 +160,39 @@ def build_games(client, model, *, series_tickers: list[str], target: date,
 
         pricer = Pricer.from_model(model, home, away, neutral=matchup.neutral)
         analysis = model.analysis(home, away, neutral=matchup.neutral)
+        lam_home, lam_away = model.expected_goals(home, away, neutral=matchup.neutral)
         specs = []
         for market in markets:
             parsed = parse_market(market, matchup)
-            if parsed is None:
-                skipped.append(f"{market.get('ticker')}: unmapped contract")
+            if parsed is not None:
+                specs.append({
+                    "ticker": parsed.ticker,
+                    "contract": parsed.contract.name,
+                    "line": parsed.contract.line,
+                    "label": parsed.label,
+                    "orderbook": client.get_orderbook(parsed.ticker),
+                    "fetched_at": now,
+                })
                 continue
-            specs.append({
-                "ticker": parsed.ticker,
-                "contract": parsed.contract.name,
-                "line": parsed.contract.line,
-                "label": parsed.label,
-                "orderbook": client.get_orderbook(parsed.ticker),
-                "fetched_at": now,
-            })
+            prop = parse_player_prop(market_series(market), market_subtitle(market))
+            if prop is not None and conn is not None:
+                player, threshold = prop
+                team = player_team(conn, player, [home, away], since=since)
+                if team is not None:
+                    team_lambda = lam_home if team == home else lam_away
+                    fair = player_goal_prob(conn, player, team, team_lambda, threshold, since=since)
+                    specs.append({
+                        "ticker": market["ticker"],
+                        "contract": f"player:{player}:{threshold}+",
+                        "line": None, "label": market_subtitle(market),
+                        "model_fair": fair, "combinable": False,
+                        "orderbook": client.get_orderbook(market["ticker"]),
+                        "fetched_at": now,
+                    })
+                    continue
+                skipped.append(f"{market.get('ticker')}: player {player!r} not in goals data")
+                continue
+            skipped.append(f"{market.get('ticker')}: unmapped contract")
         if specs:
             games.append({"home": home, "away": away, "pricer": pricer,
                           "analysis": analysis, "markets": specs})
@@ -192,7 +223,7 @@ def main() -> None:  # pragma: no cover - live wiring
     client = KalshiClient(http=KalshiHTTP(base_url=KALSHI_BASE_URL))
     try:
         games, skipped = build_games(client, model, series_tickers=SOCCER_SERIES_TICKERS,
-                                     target=today, now=now)
+                                     target=today, now=now, conn=conn, since="2016-01-01")
     except Exception as exc:  # noqa: BLE001 - network / API unreachable
         print("**UNVALIDATED MODEL — TRADE SMALL**\n")
         print(f"Could not reach Kalshi live markets: {exc}")
