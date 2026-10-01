@@ -23,13 +23,16 @@ def main() -> None:
     if not SOCCER_SERIES_TICKERS:
         print("No SOCCER_SERIES_TICKERS configured — run scripts/record_fixtures.py first.")
         return
-    markets = list(todays_soccer_markets(client, SOCCER_SERIES_TICKERS, today))
-    if not markets:
-        print(f"No soccer markets with a match on {today} in the configured series.")
-        return
-    for market in markets:
-        ob = client.get_orderbook(market["ticker"])
-        print(format_market_line(market, effective_prices(ob)))
+    try:
+        markets = list(todays_soccer_markets(client, SOCCER_SERIES_TICKERS, today))
+        if not markets:
+            print(f"No soccer markets with a match on {today} in the configured series.")
+            return
+        for market in markets:
+            ob = client.get_orderbook(market["ticker"])
+            print(format_market_line(market, effective_prices(ob)))
+    except Exception as exc:  # noqa: BLE001 - network / API unreachable
+        print(f"Could not reach the Kalshi API: {exc}")
 
 
 if __name__ == "__main__":

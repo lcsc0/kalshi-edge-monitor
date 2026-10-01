@@ -26,6 +26,9 @@ cache/
 # Large recorded fixture (3.9MB series dump) — regenerate via scripts/record_fixtures.py
 tests/fixtures/series_sports.json
 
+# Claude Code agent worktrees / local state
+.claude/
+
 # OS / editor
 .DS_Store
 .idea/
