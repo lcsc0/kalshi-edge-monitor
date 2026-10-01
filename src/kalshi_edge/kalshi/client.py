@@ -46,6 +46,10 @@ class KalshiClient:
     def get_series(self, series_ticker: str) -> dict:
         return self._http.get_json(f"/series/{series_ticker}")["series"]
 
+    def get_historical_market(self, ticker: str) -> dict:
+        body = self._http.get_json(f"/historical/markets/{ticker}")
+        return body.get("market", body)
+
     def get_historical_markets(self, *, series_ticker=None, limit=100) -> list[dict]:
         params = {"limit": limit}
         if series_ticker:

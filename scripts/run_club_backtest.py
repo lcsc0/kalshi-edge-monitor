@@ -220,6 +220,7 @@ def main(argv=None) -> int:
     p.add_argument("--since", default="2019-07-01")
     p.add_argument("--max-per-series", type=int, default=0, help="0 = all")
     p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--dump-signals", default="", help="write every signal to this CSV")
     p.add_argument("--candle-cache", default="data/club_candles.json",
                    help="on-disk candle cache ('' to disable)")
     args = p.parse_args(argv)
@@ -243,6 +244,15 @@ def main(argv=None) -> int:
     if not signals:
         print("No usable signals.")
         return 3
+    if args.dump_signals:
+        import csv
+        with open(args.dump_signals, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["series", "ticker", "kickoff", "label", "model", "market", "outcome"])
+            for sg, lab in zip(signals, labels):
+                w.writerow([lab, sg.ticker, sg.kickoff.isoformat(), sg.label,
+                            f"{sg.model_fair:.6f}", f"{sg.market_price:.6f}", sg.realized_outcome])
+        print(f"Wrote {len(signals)} signals to {args.dump_signals}")
     breakdown(signals, labels)
     print(render_report(run_backtest(signals, KellyConfig.from_policy(DEFAULT_POLICY))))
     return 0
