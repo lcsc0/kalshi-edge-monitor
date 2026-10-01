@@ -140,3 +140,25 @@ Kalshi lists is priced.
   sport-agnostic; a sport is added via data loader + config + contract parser.
 - **Auto-execution** — explicitly out of scope; gated behind a green backtest
   and a paper-trading period in a separate, hard-flagged phase.
+
+## Lineup paper test (does lineup info beat the model and the market?)
+
+`scripts/shadow_lineup.py` is a forward, paper-only test. Run it about hourly. For each open
+club market kicking off 15-90 minutes out it fetches confirmed lineups from API-Football
+(1 request per game) and logs three prices taken off the *same* order book:
+
+| variant | what it is |
+|---|---|
+| `base` | the unadjusted MLE Dixon-Coles model |
+| `stat` | `base` with missing regular starters mapped to goal multipliers (`lineup/adjust.py`; unvalidated priors) |
+| `llm`  | `base` with Claude's lineup adjustment (`lineup/llm.py`; key from `ANTHROPIC_API_KEY` or `KALSHI_ANTHROPIC_KEY`) |
+
+Markets settle against Kalshi results and the scorecard compares Brier and paper P&L of
+each variant against `base` and the market on shared markets. Notes:
+
+* API-Football's free plan only serves yesterday-today-tomorrow and ~100 requests/day, so
+  there is no historical backtest; this must accumulate forward over weeks.
+* "Regular starters" are learned from the lineups the script itself logs, so `stat` is
+  neutral for a team until ~3 of its games are logged.
+* Fixtures (kickoff times, home/away) come from football-data's `fixtures.csv`, which is a
+  short rolling list; games it doesn't list are skipped.
