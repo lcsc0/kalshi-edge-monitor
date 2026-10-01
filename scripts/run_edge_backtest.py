@@ -22,6 +22,8 @@ from kalshi_edge.backtest.replay import (
     HistoricalMarket, parse_contract, replay_market, LookaheadError,
 )
 from kalshi_edge.backtest.harness import run_backtest, render_report
+from kalshi_edge.backtest.edge_metrics import KellyConfig
+from kalshi_edge.edge.policy import DEFAULT_POLICY
 
 
 def _series_of(ticker: str) -> str:
@@ -136,7 +138,7 @@ def main(argv=None) -> int:
     if not signals:
         print("No usable signals — cannot judge model edge yet.")
         return 3
-    print(render_report(run_backtest(signals)))
+    print(render_report(run_backtest(signals, KellyConfig.from_policy(DEFAULT_POLICY))))
     return 0
 
 

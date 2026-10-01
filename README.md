@@ -44,6 +44,24 @@ model before any of it is trusted.
 | `kalshi_edge.report` | Headless markdown recommendation report (banner + per-bet analysis drivers); alerts stub. |
 | `kalshi_edge.backtest` | No-lookahead replay, calibration, hit-rate by edge bucket, simulated fractional-Kelly P&L, `has_edge` verdict. |
 
+## Strategy: small wins, long term
+
+Singles only — **no combos** by default (`StrategyPolicy.allow_combos=False`); combos
+compound model error across legs. One shared `edge/policy.py::StrategyPolicy` drives
+both the live `EdgeEngine` and the backtest's `KellyConfig`, so the strategy that is
+validated is the strategy that is traded:
+
+| Rule | Default | Why |
+|---|---|---|
+| Edge band | 3pp – 10pp | ignore noise; >10pp is a probable model/data error |
+| Side-probability band | 15% – 85% | model is mildly overconfident above ~80% (real-data backtest) |
+| Kelly fraction | 1/8 | small, survivable bets |
+| Per-bet cap | 2% of bankroll | no single result matters |
+
+The live report uses the opponent-adjusted MLE goal model (Brier 0.522 vs 0.567 for the
+v1 ratio model on 2023–24 matches). Every emitted signal is written to the forward
+signal log so paper-trading results accrue before real money is risked.
+
 ## Guardrails (why it's hard to act on nonsense)
 
 - **Fractional Kelly** (default ¼) on all sizing — never full Kelly.
