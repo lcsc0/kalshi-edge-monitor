@@ -18,8 +18,9 @@ class GoalModel:
 
     @classmethod
     def from_db(cls, conn, ref_date: str, half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
-                since: str | None = None, rho: float = 0.0, max_goals: int = 10) -> "GoalModel":
-        s = team_strengths(conn, ref_date, half_life_days, since)
+                since: str | None = None, before: str | None = None,
+                rho: float = 0.0, max_goals: int = 10) -> "GoalModel":
+        s = team_strengths(conn, ref_date, half_life_days, since, before)
         return cls(s["mu"], s["home_factor"], s["teams"], rho=rho, max_goals=max_goals)
 
     def expected_goals(self, home: str, away: str, neutral: bool = True) -> tuple[float, float]:

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from kalshi_edge.backtest.replay import BacktestSignal
-from kalshi_edge.backtest.metrics import (
+from kalshi_edge.backtest.edge_metrics import (
     calibration_table,
     calibration_error,
     brier_score,

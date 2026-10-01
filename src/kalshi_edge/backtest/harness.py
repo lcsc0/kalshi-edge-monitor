@@ -10,7 +10,7 @@ fractional-Kelly walk was profitable.
 from dataclasses import dataclass, field
 
 from kalshi_edge.backtest.replay import BacktestSignal
-from kalshi_edge.backtest.metrics import (
+from kalshi_edge.backtest.edge_metrics import (
     CalibrationBin, EdgeBucket, KellyConfig, PnLResult,
     DEFAULT_EDGE_BUCKETS,
     calibration_table, calibration_error, brier_score,

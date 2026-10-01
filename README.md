@@ -78,10 +78,12 @@ python scripts/build_db.py        # writes data/football.sqlite
 python scripts/recommend.py       # model → pricer → edge → combo → report
 ```
 
-**3. Run the backtest** (the validation gate that clears the UNVALIDATED banner):
+**3. Run the backtests** (the validation gate that clears the UNVALIDATED banner):
 
 ```bash
-python scripts/run_backtest.py --run-live
+python scripts/run_backtest.py 2022-01-01 2024-12-31   # model vs real match outcomes (no Kalshi needed)
+python scripts/run_backtest_mle.py                     # v1 ratio model vs MLE model
+python scripts/run_edge_backtest.py --run-live         # flagged edge vs Kalshi prices -> calibration / P&L / has_edge
 ```
 
 All three degrade gracefully with a clear message when the database or the

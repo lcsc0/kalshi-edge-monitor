@@ -28,3 +28,13 @@ def test_home_factor_reflects_home_scoring_edge():
     conn = connect(); load_results_csv(conn, rows)
     s = team_strengths(conn, ref_date="2025-09-01")
     assert s["home_factor"] > 1.0
+
+
+def test_before_cutoff_excludes_later_matches():
+    rows = "date,home_team,away_team,home_score,away_score,tournament,city,country,neutral\n"
+    rows += "2020-01-01,A,B,5,0,Friendly,X,Y,TRUE\n"   # before cutoff
+    rows += "2025-01-01,A,B,0,5,Friendly,X,Y,TRUE\n"   # after cutoff (must be ignored)
+    conn = connect(); load_results_csv(conn, rows)
+    s = team_strengths(conn, ref_date="2021-01-01", before="2021-01-01")
+    # Only the 5-0 match counts, so A's attack must exceed its defense.
+    assert s["teams"]["A"]["attack"] > s["teams"]["A"]["defense"]

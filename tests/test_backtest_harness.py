@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from kalshi_edge.backtest.replay import BacktestSignal
-from kalshi_edge.backtest.metrics import KellyConfig
+from kalshi_edge.backtest.edge_metrics import KellyConfig
 from kalshi_edge.backtest.harness import BacktestReport, run_backtest, render_report
 
 T0 = datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -81,5 +81,5 @@ def test_harness_rejects_a_no_edge_model():
 
 
 def test_scripts_run_backtest_imports():
-    import scripts.run_backtest as rb
+    import scripts.run_edge_backtest as rb
     assert hasattr(rb, "main")
