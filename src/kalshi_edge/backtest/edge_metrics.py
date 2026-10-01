@@ -116,6 +116,17 @@ class KellyConfig:
     min_edge: float = 0.0             # only bet strictly positive edge (> min_edge)
     max_stake_fraction: float = 0.05  # per-bet exposure cap (fraction of bankroll)
     starting_bankroll: float = 1000.0
+    min_side_prob: float = 0.0        # model_fair must lie in [min_side_prob, max_side_prob]
+    max_side_prob: float = 1.0
+
+    @classmethod
+    def from_policy(cls, policy, starting_bankroll: float = 1000.0) -> "KellyConfig":
+        """Sizing/selection identical to the live `EdgeEngine.from_policy` strategy."""
+        return cls(fraction=policy.kelly_fraction, max_edge=policy.max_edge,
+                   min_edge=policy.min_edge - 1e-12,  # policy bound is inclusive
+                   max_stake_fraction=policy.max_stake_fraction,
+                   starting_bankroll=starting_bankroll,
+                   min_side_prob=policy.min_side_prob, max_side_prob=policy.max_side_prob)
 
 
 @dataclass
@@ -131,7 +142,8 @@ class PnLResult:
 
 
 def _is_flagged(s: BacktestSignal, cfg: KellyConfig) -> bool:
-    return cfg.min_edge < s.edge <= cfg.max_edge and 0.0 < s.market_price < 1.0
+    return (cfg.min_edge < s.edge <= cfg.max_edge and 0.0 < s.market_price < 1.0
+            and cfg.min_side_prob <= s.model_fair <= cfg.max_side_prob)
 
 
 def _kelly_stake_fraction(edge: float, price: float, cfg: KellyConfig) -> float:

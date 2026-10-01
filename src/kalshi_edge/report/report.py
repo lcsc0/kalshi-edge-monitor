@@ -65,11 +65,12 @@ def _analysis_block(analysis: dict) -> list[str]:
     return lines
 
 
-def _signal_block(sig: EdgeSignal) -> list[str]:
+def _signal_block(sig: EdgeSignal, stake: float | None = None) -> list[str]:
+    stake_txt = f" | stake ${_fmt(stake)}" if stake is not None else ""
     lines = [
         f"- **{sig.ticker}** — buy **{sig.side.upper()}** | model {_fmt(sig.model_fair)} "
         f"vs market {_fmt(sig.market_implied)} | edge {_signed(sig.edge)} | "
-        f"fillable {sig.fillable_size}",
+        f"fillable {sig.fillable_size}{stake_txt}",
         "  Why (analysis drivers):",
     ]
     lines.extend(_analysis_block(sig.analysis))
@@ -112,15 +113,17 @@ def render_report(data: dict) -> str:
     signals = data.get("signals", [])
     if not signals:
         lines.append("_No edges cleared the guardrails._")
+    stakes = data.get("stakes", {})
     for sig in signals:
-        lines.extend(_signal_block(sig))
+        lines.extend(_signal_block(sig, stakes.get(sig.ticker)))
+    if stakes:
+        lines.append(f"- _Total suggested exposure: ${_fmt(sum(stakes.values()))}_")
 
-    lines.append("")
-    lines.append("## Suggested combos (fractional Kelly)")
     combos = data.get("combos", [])
-    if not combos:
-        lines.append("_No combo met the joint-probability target._")
-    for entry in combos:
-        lines.extend(_combo_block(entry))
+    if combos:  # singles-only by default; combos appear only when explicitly enabled
+        lines.append("")
+        lines.append("## Suggested combos (fractional Kelly)")
+        for entry in combos:
+            lines.extend(_combo_block(entry))
 
     return "\n".join(lines) + "\n"

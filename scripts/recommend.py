@@ -32,6 +32,7 @@ from kalshi_edge.kalshi.market_parse import (
 from kalshi_edge.model.player_props import player_team, player_goal_prob
 from kalshi_edge.edge.engine import EdgeEngine
 from kalshi_edge.edge.sizing import size_bet
+from kalshi_edge.edge.policy import DEFAULT_POLICY, StrategyPolicy, side_prob
 from kalshi_edge.combo.optimizer import ComboLeg, optimize
 from kalshi_edge.report.report import render_report
 
@@ -61,15 +62,21 @@ def build_report_data(
     validated: bool = False,
     date: str = "",
     max_legs: int = 4,
+    include_combos: bool = False,
+    policy: StrategyPolicy = DEFAULT_POLICY,
 ) -> dict:
     report_games = []
     signals = []
+    stakes: dict[str, float] = {}
+    day_exposure = 0.0
     combo_legs: list[ComboLeg] = []
+    single_cap = policy.max_stake_fraction * bankroll
 
     for g in games:
         pricer = g["pricer"]
         analysis = g["analysis"]
         game_id = f"{g['home']}-{g['away']}"
+        game_exposure = 0.0
         market_rows = []
         for spec in g.get("markets", []):
             line = spec.get("line")
@@ -91,9 +98,21 @@ def build_report_data(
             })
             if not sig.suppressed:
                 signals.append(sig)
+                # Singles: fractional-Kelly stake on the side we'd buy, capped per
+                # bet / game / day (the "small wins" policy).
+                cost = _buy_cost(spec["orderbook"], sig.side, sig.market_implied)
+                p_win = side_prob(model_fair, sig.side)
+                stake = size_bet(
+                    p_win, cost, bankroll, fraction=policy.kelly_fraction,
+                    per_combo_cap=single_cap, per_game_cap=per_game_cap,
+                    per_day_cap=per_day_cap, game_exposure=game_exposure,
+                    day_exposure=day_exposure)
+                stakes[sig.ticker] = stake
+                game_exposure += stake
+                day_exposure += stake
                 # Only joint-matrix legs can enter same-game combos (the combo
                 # sums the shared goal matrix); player props are standalone.
-                if spec.get("combinable", True):
+                if include_combos and spec.get("combinable", True):
                     leg = (spec["contract"],) if line is None else (spec["contract"], line)
                     cost = _buy_cost(spec["orderbook"], sig.side, sig.market_implied)
                     combo_legs.append(ComboLeg(
@@ -103,7 +122,7 @@ def build_report_data(
                              "markets": market_rows})
 
     combos = []
-    best = optimize(combo_legs, target_prob=target_prob, max_legs=max_legs)
+    best = optimize(combo_legs, target_prob=target_prob, max_legs=max_legs) if include_combos else None
     if best is not None:
         combo_price = 1.0 / best.multiplier
         stake = size_bet(best.joint_prob, combo_price, bankroll,
@@ -116,6 +135,7 @@ def build_report_data(
         "validated": validated,
         "games": report_games,
         "signals": signals,
+        "stakes": stakes,
         "combos": combos,
     }
 
@@ -151,8 +171,9 @@ def build_games(client, model, *, series_tickers: list[str], target: date,
         if matchup is None:
             skipped.append(f"{event_ticker}: no moneyline legs to infer teams")
             continue
-        home = resolve_team(matchup.home, model.teams)
-        away = resolve_team(matchup.away, model.teams)
+        roster = model.fit.attack if hasattr(model, "fit") else model.teams  # MLE or v1
+        home = resolve_team(matchup.home, roster)
+        away = resolve_team(matchup.away, roster)
         if home is None or away is None:
             unknown = matchup.home if home is None else matchup.away
             skipped.append(f"{event_ticker}: team not in model roster ({unknown!r})")
@@ -204,7 +225,8 @@ def main() -> None:  # pragma: no cover - live wiring
     from kalshi_edge.kalshi.http import KalshiHTTP
     from kalshi_edge.kalshi.client import KalshiClient
     from kalshi_edge.data.cache import connect
-    from kalshi_edge.model.goal_model import GoalModel
+    from kalshi_edge.model.mle_model import MLEGoalModel
+    from kalshi_edge.edge.signal_log import ensure_table, log_signal
 
     DB = "data/football.sqlite"
     now = datetime.now(timezone.utc)
@@ -213,7 +235,7 @@ def main() -> None:  # pragma: no cover - live wiring
 
     try:
         conn = connect(DB)
-        model = GoalModel.from_db(conn, ref_date=ref_date, since="2016-01-01")
+        model = MLEGoalModel.from_db(conn, ref_date=ref_date, since="2014-01-01")
     except Exception as exc:  # noqa: BLE001 - degrade to a clear message
         print("**UNVALIDATED MODEL — TRADE SMALL**\n")
         print(f"Could not build the goal model from {DB}: {exc}")
@@ -229,9 +251,17 @@ def main() -> None:  # pragma: no cover - live wiring
         print(f"Could not reach Kalshi live markets: {exc}")
         return
 
-    engine = EdgeEngine()
-    print(build_report(games, engine=engine, now=now, bankroll=1000.0,
-                       date=ref_date, validated=False))
+    policy = DEFAULT_POLICY
+    engine = EdgeEngine.from_policy(policy)
+    data = build_report_data(games, engine=engine, now=now, bankroll=1000.0,
+                             date=ref_date, validated=False, policy=policy,
+                             include_combos=policy.allow_combos)
+    print(render_report(data))
+    # Forward signal log: every emitted signal is persisted so paper-trading
+    # results accrue (settle later; see edge.signal_log.realized_hit_rate).
+    ensure_table(conn)
+    for sig in data["signals"]:
+        log_signal(conn, sig, fetched_at=now.isoformat())
     if skipped:
         print("\nSkipped (unmapped / unknown team):")
         for line in skipped:
