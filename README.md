@@ -160,5 +160,7 @@ each variant against `base` and the market on shared markets. Notes:
   there is no historical backtest; this must accumulate forward over weeks.
 * "Regular starters" are learned from the lineups the script itself logs, so `stat` is
   neutral for a team until ~3 of its games are logged.
+* `scripts/hourly_lineup.py` wraps it for an ephemeral host: rebuilds the club DB, restores/persists
+  `lineup_log.sqlite` on the `shadow-data` branch, writes `LINEUP_SCORECARD.md`.
 * Fixtures (kickoff times, home/away) come from football-data's `fixtures.csv`, which is a
   short rolling list; games it doesn't list are skipped.
