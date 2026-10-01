@@ -22,7 +22,8 @@ from kalshi_edge.kalshi.http import KalshiHTTP
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--db", default="data/football.sqlite")
+    p.add_argument("--db", default=os.environ.get("SIGNALS_DB") or "data/football.sqlite",
+                   help="signal-log database (default: $SIGNALS_DB or data/football.sqlite)")
     p.add_argument("--min-n", type=int, default=300, help="settled signals needed before a series can get weight")
     p.add_argument("--no-fetch", action="store_true", help="only print the scorecard")
     args = p.parse_args(argv)

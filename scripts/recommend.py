@@ -258,10 +258,14 @@ def main() -> None:  # pragma: no cover - live wiring
 
     policy = DEFAULT_POLICY
     engine = EdgeEngine.from_policy(policy)
+    # Shadow signals live in their own DB so they can be persisted on a data branch
+    # (SIGNALS_DB); default keeps them next to the football data.
+    import os
+    sconn = connect(os.environ.get("SIGNALS_DB") or DB)
+    ensure_table(sconn)
     # Learned model/market blend: weight is 0 (=> no bets) for any series the model
     # has not yet been shown to beat the market on, using settled shadow signals.
-    ensure_table(conn)
-    blend = BlendTable.from_db(conn)
+    blend = BlendTable.from_db(sconn)
     data = build_report_data(games, engine=engine, now=now, bankroll=1000.0,
                              date=ref_date, validated=False, policy=policy,
                              include_combos=policy.allow_combos, blend=blend)
@@ -271,7 +275,7 @@ def main() -> None:  # pragma: no cover - live wiring
     # (python scripts/settle_signals.py).
     for sig in data["all_signals"]:
         if sig.market_implied > 0:  # skip markets with no usable price
-            log_signal(conn, sig, fetched_at=now.isoformat())
+            log_signal(sconn, sig, fetched_at=now.isoformat())
     if skipped:
         print("\nSkipped (unmapped / unknown team):")
         for line in skipped:
