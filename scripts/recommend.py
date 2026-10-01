@@ -64,9 +64,11 @@ def build_report_data(
     max_legs: int = 4,
     include_combos: bool = False,
     policy: StrategyPolicy = DEFAULT_POLICY,
+    blend=None,
 ) -> dict:
     report_games = []
     signals = []
+    all_signals = []  # every evaluated market (incl. suppressed): the shadow log
     stakes: dict[str, float] = {}
     day_exposure = 0.0
     combo_legs: list[ComboLeg] = []
@@ -89,7 +91,8 @@ def build_report_data(
                 orderbook=spec["orderbook"], analysis=analysis,
                 fetched_at=spec["fetched_at"], intended_size=intended_size,
                 now=now, market_prices=spec.get("market_prices"),
-                contract_key=spec.get("contract_key"))
+                contract_key=spec.get("contract_key"), blend=blend)
+            all_signals.append(sig)
             market_rows.append({
                 "contract": spec.get("label", spec["contract"]),
                 "model_fair": model_fair,
@@ -131,6 +134,7 @@ def build_report_data(
         combos.append({"combo": best, "stake": stake, "fraction": fraction})
 
     return {
+        "all_signals": all_signals,
         "date": date,
         "validated": validated,
         "games": report_games,
@@ -227,6 +231,7 @@ def main() -> None:  # pragma: no cover - live wiring
     from kalshi_edge.data.cache import connect
     from kalshi_edge.model.mle_model import MLEGoalModel
     from kalshi_edge.edge.signal_log import ensure_table, log_signal
+    from kalshi_edge.edge.blend import BlendTable
 
     DB = "data/football.sqlite"
     now = datetime.now(timezone.utc)
@@ -253,15 +258,24 @@ def main() -> None:  # pragma: no cover - live wiring
 
     policy = DEFAULT_POLICY
     engine = EdgeEngine.from_policy(policy)
+    # Shadow signals live in their own DB so they can be persisted on a data branch
+    # (SIGNALS_DB); default keeps them next to the football data.
+    import os
+    sconn = connect(os.environ.get("SIGNALS_DB") or DB)
+    ensure_table(sconn)
+    # Learned model/market blend: weight is 0 (=> no bets) for any series the model
+    # has not yet been shown to beat the market on, using settled shadow signals.
+    blend = BlendTable.from_db(sconn)
     data = build_report_data(games, engine=engine, now=now, bankroll=1000.0,
                              date=ref_date, validated=False, policy=policy,
-                             include_combos=policy.allow_combos)
+                             include_combos=policy.allow_combos, blend=blend)
     print(render_report(data))
-    # Forward signal log: every emitted signal is persisted so paper-trading
-    # results accrue (settle later; see edge.signal_log.realized_hit_rate).
-    ensure_table(conn)
-    for sig in data["signals"]:
-        log_signal(conn, sig, fetched_at=now.isoformat())
+    # Shadow log: EVERY evaluated market is persisted (not only the bets) so the
+    # scorecard / blend can learn from all of them once they settle
+    # (python scripts/settle_signals.py).
+    for sig in data["all_signals"]:
+        if sig.market_implied > 0:  # skip markets with no usable price
+            log_signal(sconn, sig, fetched_at=now.isoformat())
     if skipped:
         print("\nSkipped (unmapped / unknown team):")
         for line in skipped:

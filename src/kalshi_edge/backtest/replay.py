@@ -71,6 +71,16 @@ def _norm_price(v) -> float:
     return v / 100 if v > 1 else v
 
 
+def _field(v):
+    """Scalar from a candle field that may be a flat value or an OHLC dict."""
+    if isinstance(v, dict):
+        for k in ("close", "mean", "previous", "open"):
+            if v.get(k) not in (None, ""):
+                return v[k]
+        return None
+    return v
+
+
 def _candle_price(c: dict) -> float | None:
     price = c.get("price")
     if isinstance(price, dict):
@@ -79,7 +89,7 @@ def _candle_price(c: dict) -> float | None:
                 return _norm_price(price[k])
     elif price not in (None, ""):
         return _norm_price(price)
-    yb, ya = c.get("yes_bid"), c.get("yes_ask")
+    yb, ya = _field(c.get("yes_bid")), _field(c.get("yes_ask"))
     if yb not in (None, "") and ya not in (None, ""):
         return (_norm_price(yb) + _norm_price(ya)) / 2
     for k in ("yes_price", "close", "mean"):
@@ -113,9 +123,13 @@ def price_at_or_before(candles: list[dict], ts: int) -> float | None:
 def replay_market(conn, market: HistoricalMarket, *, ref_date: str, pre_close_ts: int,
                   candles: list[dict], since: str | None = None, rho: float = 0.0,
                   max_goals: int = 10,
-                  half_life_days: float = DEFAULT_HALF_LIFE_DAYS) -> BacktestSignal | None:
+                  half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
+                  model=None) -> BacktestSignal | None:
     """Reconstruct one :class:`BacktestSignal`, or ``None`` if the market is
     unmapped or has no usable pre-close price.
+
+    ``model`` may be a pre-fit goal model for ``ref_date`` (e.g. a cached MLE fit);
+    it must have been fit with data strictly before the match.
 
     Guards against lookahead on both the model ``ref_date`` and the price
     timestamp before doing any work.
@@ -133,8 +147,9 @@ def replay_market(conn, market: HistoricalMarket, *, ref_date: str, pre_close_ts
     if market_price is None:
         return None
 
-    model = GoalModel.from_db(conn, ref_date=ref_date, half_life_days=half_life_days,
-                              since=since, rho=rho, max_goals=max_goals)
+    if model is None:
+        model = GoalModel.from_db(conn, ref_date=ref_date, half_life_days=half_life_days,
+                                  since=since, rho=rho, max_goals=max_goals)
     pricer = Pricer.from_model(model, market.home, market.away, neutral=market.neutral)
     model_fair = pricer.price(market.contract.name, market.contract.line)
 

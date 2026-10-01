@@ -18,6 +18,7 @@ venv/
 
 # Local data / model artifacts / DB
 *.sqlite
+!shadow/*.sqlite
 *.sqlite3
 *.db
 data/

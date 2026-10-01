@@ -42,6 +42,13 @@ class EdgeSignal:
     suppressed: bool
     suppression_reason: Optional[str]
     analysis: dict[str, Any]        # GoalModel.analysis record (§3a grounding)
+    raw_model_fair: Optional[float] = None  # model prob before any blend (what the blend learns from)
+    entry_price: Optional[float] = None     # VWAP cost per contract of `side` at the intended size
+
+
+def series_of(ticker: str) -> str:
+    """'KXEPLGAME-26MAY24LFCBRE-TIE' -> 'KXEPLGAME' (the blend / scorecard key)."""
+    return (ticker or "").split("-")[0]
 
 
 class EdgeEngine:
@@ -73,8 +80,14 @@ class EdgeEngine:
         now: Optional[datetime] = None,
         market_prices: Optional[dict[str, float]] = None,
         contract_key: Optional[str] = None,
+        blend=None,
     ) -> EdgeSignal:
+        """``blend`` is an optional ``(series, raw_fair, market_implied) -> fair``
+        (see ``edge.blend.BlendTable``). The edge is then measured against the
+        *blended* probability, which shrinks to zero where the model has not been
+        shown to add information; the raw model probability is kept on the signal."""
         now = now or datetime.now(timezone.utc)
+        raw_fair = model_fair
 
         # --- market-implied YES probability (de-vigged) ---
         if market_prices is not None:
@@ -88,6 +101,8 @@ class EdgeEngine:
                                         analysis, "no_market")
             market_implied = devig_single(mid)
 
+        if blend is not None:
+            model_fair = blend(series_of(ticker), raw_fair, market_implied)
         edge = model_fair - market_implied
         side = "yes" if edge > 0 else "no"
 
@@ -100,7 +115,8 @@ class EdgeEngine:
                 ticker=ticker, side=side, model_fair=model_fair,
                 market_implied=market_implied, edge=edge,
                 fillable_size=fill.filled, slippage=fill.slippage,
-                suppressed=suppressed, suppression_reason=reason, analysis=analysis)
+                suppressed=suppressed, suppression_reason=reason, analysis=analysis,
+                raw_model_fair=raw_fair, entry_price=fill.avg_price)
 
         # --- §3 guardrails, first failure wins ---
         age = (now - fetched_at).total_seconds()
@@ -125,4 +141,5 @@ class EdgeEngine:
             ticker=ticker, side="", model_fair=model_fair,
             market_implied=market_implied if market_implied is not None else 0.0,
             edge=0.0, fillable_size=0, slippage=None,
-            suppressed=True, suppression_reason=reason, analysis=analysis)
+            suppressed=True, suppression_reason=reason, analysis=analysis,
+            raw_model_fair=model_fair)

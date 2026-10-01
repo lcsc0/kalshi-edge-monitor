@@ -69,13 +69,31 @@ def _series_key(series: str) -> str:
     return (series or "").upper().split("-")[0]
 
 
+# Club-league series (KXEPLGAME, KXLALIGATOTAL, ...) share the World Cup subtitle
+# grammar, so they are canonicalised onto the KXWC* keys. Explicit prefixes only:
+# a generic "*GAME" rule would wrongly route MLB/NBA series to the soccer pricer.
+_CLUB_SUFFIX = (("TEAMTOTAL", "KXWCTEAMTOTAL"), ("BTTS", "KXWCBTTS"),
+                ("TOTAL", "KXWCTOTAL"), ("SPREAD", "KXWCSPREAD"), ("GAME", "KXWCGAME"))
+
+
+def _canonical_key(key: str) -> str:
+    from kalshi_edge.config import CLUB_LEAGUES
+    for prefix in CLUB_LEAGUES:
+        if key.startswith("KX" + prefix):
+            rest = key[2 + len(prefix):]
+            for suffix, canon in _CLUB_SUFFIX:
+                if rest == suffix:
+                    return canon
+    return key
+
+
 def parse_contract(series: str, subtitle: str, home: str, away: str) -> ContractSpec | None:
     """Best-effort map of a Kalshi soccer market to a Pricer leg.
 
     Returns ``None`` for market types outside the SP2c Pricer surface
     (spreads, player goals) — the caller records them as *unmapped*.
     """
-    key = _series_key(series)
+    key = _canonical_key(_series_key(series))
     sub = (subtitle or "").strip()
     low = sub.lower()
 

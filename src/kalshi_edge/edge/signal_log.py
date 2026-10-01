@@ -32,24 +32,42 @@ CREATE TABLE IF NOT EXISTS signal_log (
 """
 
 
+# Columns added after the first release; ``ensure_table`` migrates old databases.
+_MIGRATIONS = (
+    ("raw_model_fair", "REAL"),   # model prob before any blend
+    ("entry_price", "REAL"),      # VWAP cost per contract of `side` when logged
+    ("result_yes", "INTEGER"),    # market truth: 1 if YES settled, 0 if NO (side-independent)
+    ("settled_at", "TEXT"),
+)
+
+
 def ensure_table(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(signal_log)")}
+    for col, typ in _MIGRATIONS:
+        if col not in have:
+            conn.execute(f"ALTER TABLE signal_log ADD COLUMN {col} {typ}")
     conn.commit()
 
 
 def log_signal(conn: sqlite3.Connection, signal: EdgeSignal,
                fetched_at: str, logged_at: str | None = None) -> None:
-    """Persist a single :class:`EdgeSignal` with its inputs and timestamps."""
+    """Persist a single :class:`EdgeSignal` with its inputs and timestamps.
+
+    Log *every* evaluated market, suppressed ones included: the blend and the
+    scorecard learn from the model-vs-market comparison on all of them, not only
+    on the few that pass the betting filters."""
     logged_at = logged_at or datetime.now(timezone.utc).isoformat()
     conn.execute(
         "INSERT INTO signal_log (ticker, side, model_fair, market_implied, edge, "
         "fillable_size, slippage, suppressed, suppression_reason, analysis, "
-        "fetched_at, logged_at, outcome) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+        "fetched_at, logged_at, outcome, raw_model_fair, entry_price) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)",
         (signal.ticker, signal.side, signal.model_fair, signal.market_implied,
          signal.edge, signal.fillable_size, signal.slippage,
          1 if signal.suppressed else 0, signal.suppression_reason,
-         json.dumps(signal.analysis), fetched_at, logged_at),
+         json.dumps(signal.analysis), fetched_at, logged_at,
+         signal.raw_model_fair, signal.entry_price),
     )
     conn.commit()
 
