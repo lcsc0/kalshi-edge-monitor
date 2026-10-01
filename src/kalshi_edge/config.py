@@ -47,3 +47,9 @@ def load_env(path: str = ".env") -> None:
             continue
         key, _, value = line.partition("=")
         os.environ.setdefault(key.strip(), value.strip())
+
+
+def anthropic_api_key() -> str:
+    """Anthropic API key for LLM steps: ``ANTHROPIC_API_KEY``, else ``KALSHI_ANTHROPIC_KEY``.
+    Returns "" if neither is set. Never log the value."""
+    return os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("KALSHI_ANTHROPIC_KEY", "")
