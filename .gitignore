@@ -21,7 +21,7 @@ venv/
 !shadow/*.sqlite
 *.sqlite3
 *.db
-data/
+/data/
 cache/
 
 # Large recorded fixture (3.9MB series dump) — regenerate via scripts/record_fixtures.py
