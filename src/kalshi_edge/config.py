@@ -18,6 +18,19 @@ SOCCER_SERIES_TICKERS: list[str] = [
     "KXWCTEAMH2H",      # team head-to-head
 ]
 
+# Club league series prefix (Kalshi: KX<prefix>GAME / TOTAL / BTTS / SPREAD) ->
+# football-data.co.uk tournament label stored in data/clubs.sqlite.
+CLUB_LEAGUES: dict[str, str] = {
+    "EPL": "EPL",
+    "EFLCHAMPIONSHIP": "EFL Championship",
+    "BUNDESLIGA": "Bundesliga",
+    "SERIEA": "Serie A",
+    "LALIGA": "La Liga",
+    "LIGUE1": "Ligue 1",
+    "EREDIVISIE": "Eredivisie",
+    "LIGAPORTUGAL": "Liga Portugal",
+}
+CLUB_MARKET_KINDS = ("GAME", "TOTAL", "BTTS", "SPREAD")
 
 import os
 from pathlib import Path

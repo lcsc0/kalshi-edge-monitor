@@ -57,3 +57,18 @@ class KalshiClient:
         params = {"start_ts": start_ts, "end_ts": end_ts, "period_interval": period_interval}
         body = self._http.get_json(f"/historical/markets/{ticker}/candlesticks", params=params)
         return body.get("candlesticks", [])
+
+    def iter_historical_markets(self, *, series_ticker=None, limit=1000) -> Iterator[dict]:
+        """All archived markets for a series, following the cursor."""
+        cursor = ""
+        while True:
+            params = {"limit": limit}
+            if series_ticker:
+                params["series_ticker"] = series_ticker
+            if cursor:
+                params["cursor"] = cursor
+            body = self._http.get_json("/historical/markets", params=params)
+            yield from body.get("markets", [])
+            cursor = body.get("cursor") or ""
+            if not cursor:
+                return

@@ -51,22 +51,45 @@ def fit_dixon_coles(conn, ref_date: str, since: str | None = None,
     lg_hs, lg_aw = gammaln(hs + 1), gammaln(aw + 1)
 
     def nll(p):
+        """Weighted Dixon-Coles negative log-likelihood and its analytic gradient."""
         att, deff, home, rho = p[:T], p[T:2*T], p[2*T], p[2*T+1]
         log_lam = att[hi] - deff[ai] + home * (1 - neu)
         log_mu = att[ai] - deff[hi]
         lam, mu = np.exp(log_lam), np.exp(log_mu)
         t = np.ones_like(lam)
-        m00 = (hs == 0) & (aw == 0); t[m00] = 1 - lam[m00]*mu[m00]*rho
-        m01 = (hs == 0) & (aw == 1); t[m01] = 1 + lam[m01]*rho
-        m10 = (hs == 1) & (aw == 0); t[m10] = 1 + mu[m10]*rho
-        m11 = (hs == 1) & (aw == 1); t[m11] = 1 - rho
+        d_ll = np.zeros_like(lam)   # d t / d log_lam
+        d_lm = np.zeros_like(lam)   # d t / d log_mu
+        d_rho = np.zeros_like(lam)  # d t / d rho
+        m00 = (hs == 0) & (aw == 0)
+        t[m00] = 1 - lam[m00]*mu[m00]*rho
+        d_ll[m00] = d_lm[m00] = -lam[m00]*mu[m00]*rho
+        d_rho[m00] = -lam[m00]*mu[m00]
+        m01 = (hs == 0) & (aw == 1)
+        t[m01] = 1 + lam[m01]*rho
+        d_ll[m01] = lam[m01]*rho
+        d_rho[m01] = lam[m01]
+        m10 = (hs == 1) & (aw == 0)
+        t[m10] = 1 + mu[m10]*rho
+        d_lm[m10] = mu[m10]*rho
+        d_rho[m10] = mu[m10]
+        m11 = (hs == 1) & (aw == 1)
+        t[m11] = 1 - rho
+        d_rho[m11] = -1.0
         t = np.clip(t, 1e-9, None)
         ll = (hs*log_lam - lam - lg_hs) + (aw*log_mu - mu - lg_aw) + np.log(t)
-        return -np.sum(w * ll)
+
+        g_ll = w * (hs - lam + d_ll / t)   # d ll / d log_lam, weighted
+        g_lm = w * (aw - mu + d_lm / t)    # d ll / d log_mu, weighted
+        g_att = np.bincount(hi, g_ll, T) + np.bincount(ai, g_lm, T)
+        g_def = -np.bincount(ai, g_ll, T) - np.bincount(hi, g_lm, T)
+        g_home = np.sum(g_ll * (1 - neu))
+        g_rho = np.sum(w * d_rho / t)
+        grad = -np.concatenate([g_att, g_def, [g_home, g_rho]])
+        return -np.sum(w * ll), grad
 
     x0 = np.concatenate([np.zeros(2*T), [0.25, -0.05]])
     bounds = [(-3, 3)]*(2*T) + [(1e-9, 1.0), (-0.2, 0.2)]
-    res = minimize(nll, x0, method="L-BFGS-B", bounds=bounds,
+    res = minimize(nll, x0, jac=True, method="L-BFGS-B", bounds=bounds,
                    options={"maxiter": max_iter, "maxfun": 200000})
     att, deff, home, rho = res.x[:T], res.x[T:2*T], float(res.x[2*T]), float(res.x[2*T+1])
     shift = att.mean()

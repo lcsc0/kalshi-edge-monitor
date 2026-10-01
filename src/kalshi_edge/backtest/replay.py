@@ -71,6 +71,16 @@ def _norm_price(v) -> float:
     return v / 100 if v > 1 else v
 
 
+def _field(v):
+    """Scalar from a candle field that may be a flat value or an OHLC dict."""
+    if isinstance(v, dict):
+        for k in ("close", "mean", "previous", "open"):
+            if v.get(k) not in (None, ""):
+                return v[k]
+        return None
+    return v
+
+
 def _candle_price(c: dict) -> float | None:
     price = c.get("price")
     if isinstance(price, dict):
@@ -79,7 +89,7 @@ def _candle_price(c: dict) -> float | None:
                 return _norm_price(price[k])
     elif price not in (None, ""):
         return _norm_price(price)
-    yb, ya = c.get("yes_bid"), c.get("yes_ask")
+    yb, ya = _field(c.get("yes_bid")), _field(c.get("yes_ask"))
     if yb not in (None, "") and ya not in (None, ""):
         return (_norm_price(yb) + _norm_price(ya)) / 2
     for k in ("yes_price", "close", "mean"):
