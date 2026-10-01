@@ -7,7 +7,7 @@ report. Degrades gracefully with a clear message if historical data is unreachab
 
 Usage:
     python scripts/run_edge_backtest.py [--db data/football.sqlite] [--limit 200]
-                                   [--lead-hours 1] [--since 2016-01-01]
+                                   [--lead-hours 1] [--since 2016-01-01] [--model mle|goal]
 """
 import argparse
 import os
@@ -30,11 +30,23 @@ def _series_of(ticker: str) -> str:
     return (ticker or "").split("-")[0]
 
 
+# Kalshi gives no kickoff time on soccer markets: ``occurrence_datetime`` /
+# ``expected_expiration_time`` are a placeholder near the *end* of the match, so
+# "kickoff - lead" lands in-play with the result already priced in. ``close_time``
+# is when the result was determined (<= ~3.3h after kickoff even with extra time +
+# penalties), so close_time - 3.5h is a conservative pre-match proxy: always before
+# real kickoff, hence no lookahead, at the cost of a slightly stale price.
+KICKOFF_BEFORE_CLOSE = timedelta(hours=3.5)
+
+
 def _kickoff(market: dict):
+    ts = market.get("close_time")
+    if ts:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")) - KICKOFF_BEFORE_CLOSE
     for field in ("occurrence_datetime", "expected_expiration_time"):
         ts = market.get(field)
         if ts:
-            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")) - KICKOFF_BEFORE_CLOSE
     return None
 
 
@@ -54,11 +66,22 @@ def _resolve_teams(market: dict, model_teams: set[str]) -> tuple[str, str] | Non
 
 
 def build_signals(client: KalshiClient, conn, series_tickers, *, limit: int,
-                  lead_hours: float, since: str | None):
+                  lead_hours: float, since: str | None, model_kind: str = "mle"):
     """Return (signals, stats). Never raises per-market; skips what it can't map."""
     from kalshi_edge.model.strengths import team_strengths
     # Team universe the model knows, for name resolution.
     model_teams = set(team_strengths(conn, ref_date="2100-01-01", since=since)["teams"].keys())
+
+    fits: dict = {}  # ref_date -> fitted model (many markets share a match day)
+
+    def model_for(ref_date: str):
+        if ref_date not in fits:
+            if model_kind == "mle":
+                from kalshi_edge.model.mle_model import MLEGoalModel
+                fits[ref_date] = MLEGoalModel.from_db(conn, ref_date=ref_date, since=since)
+            else:
+                fits[ref_date] = None  # replay_market builds the v1 GoalModel
+        return fits[ref_date]
 
     signals = []
     stats = {"markets": 0, "unmapped": 0, "unsettled": 0, "no_price": 0,
@@ -93,7 +116,8 @@ def build_signals(client: KalshiClient, conn, series_tickers, *, limit: int,
                 settled_yes=settled, neutral=True)
             try:
                 sig = replay_market(conn, market, ref_date=ref_date,
-                                    pre_close_ts=pre_close_ts, candles=candles, since=since)
+                                    pre_close_ts=pre_close_ts, candles=candles, since=since,
+                                    model=model_for(ref_date))
             except LookaheadError:
                 stats["lookahead_skips"] += 1
                 continue
@@ -114,6 +138,8 @@ def main(argv=None) -> int:
     p.add_argument("--limit", type=int, default=200)
     p.add_argument("--lead-hours", type=float, default=1.0)
     p.add_argument("--since", default="2016-01-01")
+    p.add_argument("--model", choices=("mle", "goal"), default="mle",
+                   help="mle = opponent-adjusted Dixon-Coles; goal = raw goals-for/against v1")
     args = p.parse_args(argv)
 
     if not os.path.exists(args.db):
@@ -125,7 +151,7 @@ def main(argv=None) -> int:
     try:
         signals, stats = build_signals(client, conn, SOCCER_SERIES_TICKERS,
                                        limit=args.limit, lead_hours=args.lead_hours,
-                                       since=args.since)
+                                       since=args.since, model_kind=args.model)
     except Exception as exc:  # network / proxy / API shape — degrade gracefully
         print("Could not reach Kalshi historical data (backtest not run).")
         print(f"  reason: {type(exc).__name__}: {exc}")
