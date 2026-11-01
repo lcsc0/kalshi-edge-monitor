@@ -35,8 +35,16 @@ def _moneyline_names(markets: list[dict]) -> list[str]:
 def build_club_signals(client, model, fix_conn, engine: EdgeEngine, *, now: datetime,
                        blend=None, leagues=None, kinds=CLUB_MARKET_KINDS[:3],
                        intended_size: int = 100, min_lead_minutes: int = 30,
-                       horizon_days: int = 4, workers: int = 6):
-    """-> (signals, stats). ``client`` needs ``iter_markets`` and ``get_orderbook``."""
+                       horizon_days: int = 4, workers: int = 6,
+                       max_lead_minutes: int | None = None, variants_for=None):
+    """-> (signals, stats). ``client`` needs ``iter_markets`` and ``get_orderbook``.
+
+    Lineup-test hooks (both optional; defaults leave behaviour unchanged):
+      * ``max_lead_minutes`` - also skip fixtures kicking off later than this;
+      * ``variants_for(home, away, kickoff, event) -> {name: (Pricer, info)} | None`` -
+        extra model variants priced off the *same* order book as the base model. Returning
+        None skips the fixture (e.g. lineups not out yet). Each signal's ``analysis`` then
+        carries ``variant`` ("base" or the name), ``event``, ``kickoff`` (ISO UTC) and the variant's ``info``."""
     stats = defaultdict(int)
     plan = []  # (market, contract, home, away, model_fair, analysis)
     horizon = now + timedelta(days=horizon_days)
@@ -71,19 +79,28 @@ def build_club_signals(client, model, fix_conn, engine: EdgeEngine, *, now: date
             if kickoff > horizon:
                 stats["beyond_horizon"] += 1
                 continue
+            if max_lead_minutes is not None and kickoff > now + timedelta(minutes=max_lead_minutes):
+                stats["outside_window"] += 1
+                continue
             h, a = row["home_team"], row["away_team"]
             if h not in model.fit.attack or a not in model.fit.attack:
                 stats["unknown_team"] += 1
                 continue
+            extras = {}
+            if variants_for is not None:
+                extras = variants_for(h, a, kickoff, suffix)
+                if extras is None:
+                    stats["no_lineup"] += 1
+                    continue
             resolved[suffix] = (h, a, home_k, away_k, Pricer.from_model(model, h, a, neutral=False),
-                                model.analysis(h, a, neutral=False))
+                                model.analysis(h, a, neutral=False), extras, suffix, kickoff.isoformat())
         for kind, ms in by_kind.items():
             for m in ms:
                 suffix = event_suffix(m["event_ticker"] if "event_ticker" in m
                                       else m["ticker"].rsplit("-", 1)[0])
                 if suffix not in resolved:
                     continue
-                h, a, hk, ak, pricer, analysis = resolved[suffix]
+                h, a, hk, ak, pricer, analysis, extras, event, ko_iso = resolved[suffix]
                 series = m["ticker"].split("-")[0]
                 contract = parse_contract(series, m.get("yes_sub_title") or "", hk, ak)
                 if contract is None:
@@ -94,7 +111,16 @@ def build_club_signals(client, model, fix_conn, engine: EdgeEngine, *, now: date
                 except (ValueError, KeyError):
                     stats["pricer_error"] += 1
                     continue
-                plan.append((m, fair, analysis))
+                if variants_for is None:
+                    plan.append((m, fair, analysis))
+                    continue
+                plan.append((m, fair, {**analysis, "variant": "base", "event": event, "kickoff": ko_iso}))
+                for name, (vpricer, info) in extras.items():
+                    try:
+                        plan.append((m, vpricer.price(contract.name, contract.line),
+                                     {**analysis, **info, "variant": name, "event": event, "kickoff": ko_iso}))
+                    except (ValueError, KeyError):
+                        stats["pricer_error"] += 1
 
     def evaluate(item):
         m, fair, analysis = item
