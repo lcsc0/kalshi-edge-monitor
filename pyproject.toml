@@ -10,6 +10,8 @@ dependencies = ["httpx>=0.27", "numpy>=1.26", "scipy>=1.11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "respx>=0.21"]
+# Vendored Kronos (src/kalshi_edge/vendor/kronos, MIT) needs these; install with `pip install -e .[kronos]`
+kronos = ["torch>=2.0.0", "pandas>=2.2", "einops==0.8.1", "huggingface_hub==0.33.1", "safetensors==0.6.2", "tqdm>=4.67"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kalshi_edge"]
