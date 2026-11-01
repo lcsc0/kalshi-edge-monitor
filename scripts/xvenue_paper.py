@@ -78,6 +78,37 @@ def report(conn) -> str:
     L.append(f"...of those, still profitable one tick later: {n_dly}, paper profit ${dly:.2f}"
              f"{'' if best_d is None else f' (best {best_d:.3f}/contract)'}")
     L.append("  (ticks repeat the same opportunity - treat $ as an upper bound; sizes are top-of-book only)")
+    L.append("")
+    L.append("-- lead-lag: Polymarket jump >= 4pts in one tick -> paper-trade Kalshi in the same direction --")
+    L.append("   entry = Kalshi ask (buy YES) / 1-bid (buy NO) one tick AFTER the Polymarket jump; mark = Kalshi mid 30s later; fee both ways ignored")
+    trades = []
+    for xs in seq.values():
+        i = 1
+        while i < len(xs) - 1:
+            a, b = xs[i - 1], xs[i]
+            ok = all(v is not None for v in (a["p_bid"], a["p_ask"], b["p_bid"], b["p_ask"], xs[i + 1]["k_bid"], xs[i + 1]["k_ask"]))
+            if ok:
+                d = (b["p_bid"] + b["p_ask"]) / 2 - (a["p_bid"] + a["p_ask"]) / 2
+                if abs(d) >= 0.04:
+                    e = xs[i + 1]
+                    entry = e["k_ask"] if d > 0 else 1 - e["k_bid"]
+                    fut = next((y for y in xs[i + 1:] if y["ts"] >= e["ts"] + 30), None)
+                    if fut and fut["k_bid"] is not None and fut["k_ask"] is not None:
+                        mid = (fut["k_bid"] + fut["k_ask"]) / 2
+                        exit_ = mid if d > 0 else 1 - mid
+                        sz = min(e["k_asz"] if d > 0 else e["k_bsz"], 100.0)
+                        trades.append((e["game"], e["outcome"], d, entry, exit_, sz))
+                    i += 10  # skip the rest of this move
+                    continue
+            i += 1
+    if not trades:
+        L.append("  no qualifying Polymarket jumps")
+    else:
+        tot = sum((x - en) * sz for _, _, _, en, x, sz in trades)
+        L.append(f"  {len(trades)} signals, mark-to-market P&L ${tot:+.2f} on <=100 contracts each, "
+                 f"hit rate {sum(1 for t in trades if t[4] > t[3])}/{len(trades)}")
+        for g, o, d, en, x, sz in trades[:12]:
+            L.append(f"    {g} {o}: Poly jump {d:+.2f}, Kalshi entry {en:.2f} -> {x:.2f} ({(x-en)*sz:+.2f} on {sz:.0f})")
     cross = conn.execute("SELECT AVG(ABS(((k_bid+k_ask)/2)-((p_bid+p_ask)/2))) FROM xv WHERE k_bid IS NOT NULL AND p_bid IS NOT NULL AND k_ask IS NOT NULL AND p_ask IS NOT NULL").fetchone()[0]
     L.append(f"mean |Kalshi mid - Polymarket mid|: {cross if cross is None else round(cross, 4)}")
     return "\n".join(L)
