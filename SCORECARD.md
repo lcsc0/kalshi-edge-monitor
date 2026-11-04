@@ -1,9 +1,9 @@
 # Shadow scorecard
 
-Updated 2026-11-03 10:02 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-04 10:02 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
-Settled 50 markets, 0 still open (50 tickers checked).
+Settled 0 markets, 30 still open (30 tickers checked).
 
 series                       n  Brier model  Brier mkt   verdict  bets   P&L/ct
 KXEPLBTTS                    1       0.2618     0.3660     model     0        -
