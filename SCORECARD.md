@@ -1,11 +1,14 @@
 # Shadow scorecard
 
-Updated 2026-11-04 10:02 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-05 10:01 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
-Settled 0 markets, 30 still open (30 tickers checked).
+Settled 30 markets, 0 still open (30 tickers checked).
 
 series                       n  Brier model  Brier mkt   verdict  bets   P&L/ct
+KXEFLCHAMPIONSHIPBTTS        3       0.2712     0.2141    market     0        -
+KXEFLCHAMPIONSHIPGAME        9       0.2357     0.2625     model     0        -
+KXEFLCHAMPIONSHIPTOTAL      18       0.1712     0.1432    market     0        -
 KXEPLBTTS                    1       0.2618     0.3660     model     0        -
 KXEPLGAME                    3       0.3063     0.2540    market     0        -
 KXEPLTOTAL                   6       0.1466     0.1838     model     0        -
@@ -21,6 +24,9 @@ KXSERIEATOTAL               12       0.2094     0.1967    market     0        -
 
 Blend weights (model vs market):
 series                        n   w_hat      se  weight used
+KXEFLCHAMPIONSHIPBTTS         3  -3.945   2.982        0.000
+KXEFLCHAMPIONSHIPGAME         9   2.103   1.833        0.000
+KXEFLCHAMPIONSHIPTOTAL       18  -4.937   1.354        0.000
 KXEPLBTTS                     1   0.000     inf        0.000
 KXEPLGAME                     3  -7.221   3.374        0.000
 KXEPLTOTAL                    6   7.032   1.737        0.000
