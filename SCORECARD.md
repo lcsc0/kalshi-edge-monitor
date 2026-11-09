@@ -1,61 +1,61 @@
 # Shadow scorecard
 
-Updated 2026-11-08 10:04 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-09 10:02 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
-Settled 0 markets, 300 still open (300 tickers checked).
+Settled 300 markets, 0 still open (300 tickers checked).
 
 series                       n  Brier model  Brier mkt   verdict  bets   P&L/ct
-KXBUNDESLIGABTTS             4       0.2475     0.2097    market     0        -
-KXBUNDESLIGAGAME            12       0.1140     0.1182     model     0        -
-KXBUNDESLIGATOTAL           24       0.2062     0.1673    market     0        -
+KXBUNDESLIGABTTS             7       0.2374     0.2001    market     0        -
+KXBUNDESLIGAGAME            21       0.1027     0.1016    market     0        -
+KXBUNDESLIGATOTAL           42       0.1467     0.1272    market     0        -
 KXEFLCHAMPIONSHIPBTTS       14       0.2565     0.2368    market     0        -
 KXEFLCHAMPIONSHIPGAME       42       0.2365     0.2424     model     0        -
 KXEFLCHAMPIONSHIPTOTAL      84       0.1578     0.1453    market     0        -
-KXEPLBTTS                    5       0.2358     0.2300    market     0        -
-KXEPLGAME                   15       0.2318     0.2203    market     0        -
-KXEPLTOTAL                  30       0.1547     0.1521    market     0        -
-KXEREDIVISIEBTTS             3       0.2589     0.2397    market     0        -
-KXEREDIVISIEGAME             9       0.2396     0.2188    market     0        -
-KXEREDIVISIETOTAL           18       0.1574     0.1466    market     0        -
-KXLALIGABTTS                 5       0.2309     0.2390     model     0        -
-KXLALIGAGAME                15       0.1831     0.1857     model     0        -
-KXLALIGATOTAL               30       0.1075     0.1100     model     0        -
-KXLIGAPORTUGALBTTS           3       0.2328     0.2230    market     0        -
-KXLIGAPORTUGALGAME           9       0.1014     0.1018     model     0        -
-KXLIGAPORTUGALTOTAL         18       0.1807     0.1986     model     0        -
-KXLIGUE1BTTS                 2       0.2501     0.2603     model     0        -
-KXLIGUE1GAME                 6       0.0847     0.0512    market     0        -
-KXLIGUE1TOTAL               12       0.2444     0.2323    market     0        -
-KXSERIEABTTS                 6       0.2854     0.2834    market     0        -
-KXSERIEAGAME                18       0.2215     0.2045    market     0        -
-KXSERIEATOTAL               36       0.1397     0.1434     model     0        -
+KXEPLBTTS                   10       0.2293     0.2307     model     0        -
+KXEPLGAME                   30       0.2163     0.1977    market     0        -
+KXEPLTOTAL                  60       0.1566     0.1498    market     0        -
+KXEREDIVISIEBTTS             7       0.1964     0.1692    market     0        -
+KXEREDIVISIEGAME            21       0.1995     0.1869    market     0        -
+KXEREDIVISIETOTAL           42       0.2132     0.1948    market     0        -
+KXLALIGABTTS                10       0.2366     0.2569     model     0        -
+KXLALIGAGAME                30       0.1772     0.1638    market     0        -
+KXLALIGATOTAL               60       0.1198     0.1321     model     0        -
+KXLIGAPORTUGALBTTS           7       0.2606     0.2406    market     0        -
+KXLIGAPORTUGALGAME          21       0.1191     0.1017    market     0        -
+KXLIGAPORTUGALTOTAL         42       0.1603     0.1583    market     0        -
+KXLIGUE1BTTS                 6       0.2523     0.2717     model     0        -
+KXLIGUE1GAME                18       0.1663     0.1461    market     0        -
+KXLIGUE1TOTAL               36       0.1267     0.1239    market     0        -
+KXSERIEABTTS                11       0.2821     0.2848     model     0        -
+KXSERIEAGAME                33       0.1986     0.1972    market     0        -
+KXSERIEATOTAL               66       0.1297     0.1383     model     0        -
 
 Blend weights (model vs market):
 series                        n   w_hat      se  weight used
-KXBUNDESLIGABTTS              4  -0.765   2.116        0.000
-KXBUNDESLIGAGAME             12   1.498   2.210        0.000
-KXBUNDESLIGATOTAL            24  -1.117   0.741        0.000
+KXBUNDESLIGABTTS              7  -1.448   1.770        0.000
+KXBUNDESLIGAGAME             21   0.325   1.304        0.000
+KXBUNDESLIGATOTAL            42  -0.822   0.635        0.000
 KXEFLCHAMPIONSHIPBTTS        14  -1.493   1.875        0.000
 KXEFLCHAMPIONSHIPGAME        42   0.864   0.845        0.000
 KXEFLCHAMPIONSHIPTOTAL       84  -1.108   0.658        0.000
-KXEPLBTTS                     5  -0.279   3.923        0.000
-KXEPLGAME                    15  -1.743   2.430        0.000
-KXEPLTOTAL                   30  -0.464   1.985        0.000
-KXEREDIVISIEBTTS              3  -3.171   6.391        0.000
-KXEREDIVISIEGAME              9  -2.038   2.483        0.000
-KXEREDIVISIETOTAL            18  -3.681   2.415        0.000
-KXLALIGABTTS                  5   4.083   6.973        0.000
-KXLALIGAGAME                 15   0.813   1.774        0.000
-KXLALIGATOTAL                30   0.866   1.040        0.000
-KXLIGAPORTUGALBTTS            3  -7.957  12.683        0.000
-KXLIGAPORTUGALGAME            9   0.624   3.029        0.000
-KXLIGAPORTUGALTOTAL          18  10.235   2.559        0.000
-KXLIGUE1BTTS                  2  28.005  24.954        0.000
-KXLIGUE1GAME                  6  -2.585   0.745        0.000
-KXLIGUE1TOTAL                12  -2.974   3.369        0.000
-KXSERIEABTTS                  6   0.322   3.215        0.000
-KXSERIEAGAME                 18  -3.257   2.165        0.000
-KXSERIEATOTAL                36   1.045   1.083        0.000
+KXEPLBTTS                    10   0.695   2.614        0.000
+KXEPLGAME                    30  -3.501   1.582        0.000
+KXEPLTOTAL                   60  -1.207   1.119        0.000
+KXEREDIVISIEBTTS              7  -3.902   2.569        0.000
+KXEREDIVISIEGAME             21  -2.239   1.952        0.000
+KXEREDIVISIETOTAL            42  -2.221   1.131        0.000
+KXLALIGABTTS                 10   2.583   2.264        0.000
+KXLALIGAGAME                 30  -1.538   1.280        0.000
+KXLALIGATOTAL                60   1.591   0.593        0.000
+KXLIGAPORTUGALBTTS            7  -5.899   4.461        0.000
+KXLIGAPORTUGALGAME           21  -3.077   1.275        0.000
+KXLIGAPORTUGALTOTAL          42  -0.155   1.579        0.000
+KXLIGUE1BTTS                  6   4.056   4.070        0.000
+KXLIGUE1GAME                 18  -3.944   1.694        0.000
+KXLIGUE1TOTAL                36  -0.123   1.260        0.000
+KXSERIEABTTS                 11   0.685   1.972        0.000
+KXSERIEAGAME                 33   0.232   1.558        0.000
+KXSERIEATOTAL                66   1.669   0.734        0.000
 
 ```
