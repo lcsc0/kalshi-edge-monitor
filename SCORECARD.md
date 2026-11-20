@@ -1,6 +1,6 @@
 # Shadow scorecard
 
-Updated 2026-11-19 10:01 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-20 10:00 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
 Settled 0 markets, 0 still open (0 tickers checked).
