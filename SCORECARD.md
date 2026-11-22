@@ -1,9 +1,9 @@
 # Shadow scorecard
 
-Updated 2026-11-22 10:01 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-22 10:03 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
-Settled 410 markets, 220 still open (630 tickers checked).
+Settled 0 markets, 220 still open (220 tickers checked).
 
 series                       n  Brier model  Brier mkt   verdict  bets   P&L/ct
 KXBUNDESLIGABTTS            12       0.2685     0.2690     model     0        -
