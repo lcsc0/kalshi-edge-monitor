@@ -1,17 +1,17 @@
 # Shadow scorecard
 
-Updated 2026-11-25 10:01 UTC. **UNVALIDATED MODEL — TRADE SMALL**
+Updated 2026-11-26 10:00 UTC. **UNVALIDATED MODEL — TRADE SMALL**
 
 ```
-Settled 80 markets, 40 still open (120 tickers checked).
+Settled 40 markets, 0 still open (40 tickers checked).
 
 series                       n  Brier model  Brier mkt   verdict  bets   P&L/ct
 KXBUNDESLIGABTTS            14       0.2656     0.2609    market     0        -
 KXBUNDESLIGAGAME            42       0.1265     0.1188    market     0        -
 KXBUNDESLIGATOTAL           84       0.1887     0.1673    market     0        -
-KXEFLCHAMPIONSHIPBTTS       34       0.2476     0.2365    market     0        -
-KXEFLCHAMPIONSHIPGAME      102       0.2182     0.2184     model     0        -
-KXEFLCHAMPIONSHIPTOTAL     204       0.1343     0.1230    market     0        -
+KXEFLCHAMPIONSHIPBTTS       38       0.2466     0.2387    market     0        -
+KXEFLCHAMPIONSHIPGAME      114       0.2189     0.2139    market     0        -
+KXEFLCHAMPIONSHIPTOTAL     228       0.1306     0.1210    market     0        -
 KXEPLBTTS                   20       0.2448     0.2478     model     0        -
 KXEPLGAME                   60       0.2261     0.2177    market     0        -
 KXEPLTOTAL                 120       0.1562     0.1529    market     0        -
@@ -36,9 +36,9 @@ series                        n   w_hat      se  weight used
 KXBUNDESLIGABTTS             14   0.233   1.496        0.000
 KXBUNDESLIGAGAME             42  -0.517   0.873        0.000
 KXBUNDESLIGATOTAL            84  -0.811   0.488        0.000
-KXEFLCHAMPIONSHIPBTTS        34  -0.785   1.285        0.000
-KXEFLCHAMPIONSHIPGAME       102   0.513   0.556        0.000
-KXEFLCHAMPIONSHIPTOTAL      204  -0.779   0.365        0.000
+KXEFLCHAMPIONSHIPBTTS        38  -0.412   1.217        0.000
+KXEFLCHAMPIONSHIPGAME       114   0.138   0.523        0.000
+KXEFLCHAMPIONSHIPTOTAL      228  -0.661   0.355        0.000
 KXEPLBTTS                    20   0.957   1.970        0.000
 KXEPLGAME                    60  -1.579   1.337        0.000
 KXEPLTOTAL                  120  -0.443   0.865        0.000
